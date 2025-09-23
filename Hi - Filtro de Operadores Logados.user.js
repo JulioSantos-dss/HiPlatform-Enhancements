@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hi - Filtro de Operadores Logados
 // @namespace    http://tampermonkey.net/
-// @version      1.8
+// @version      1.9
 // @description  Filtro de Operadores com Interface Moderna (Searchbox outside panel)
 // @author       Julio Santos feat. AI & You
 // @match        https://www5.directtalk.com.br/static/beta/admin/main.html*
