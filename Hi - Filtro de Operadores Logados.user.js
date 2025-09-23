@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hi - Filtro de Operadores Logados
 // @namespace    http://tampermonkey.net/
-// @version      1.7
+// @version      1.8
 // @description  Filtro de Operadores com Interface Moderna (Searchbox outside panel)
 // @author       Julio Santos feat. AI & You
 // @match        https://www5.directtalk.com.br/static/beta/admin/main.html*
@@ -49,7 +49,7 @@ function createSearchAndToggleButton() {
     searchToggleWrapper.setAttribute('data-userscript-filter', 'search-toggle-wrapper'); // Mark our element
 
     let toggleButton = document.createElement('button');
-    toggleButton.textContent = 'Filtrar Operadores';
+    toggleButton.textContent = 'VINICIUS BUENO';
     toggleButton.style.padding = '10px 15px';
     toggleButton.style.backgroundColor = '#007bff';
     toggleButton.style.color = '#fff';
