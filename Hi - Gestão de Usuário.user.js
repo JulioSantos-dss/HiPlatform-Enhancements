@@ -1,12 +1,14 @@
 // ==UserScript==
 // @name         Hi - Gestão de Usuário
 // @namespace    http://tampermonkey.net/
-// @version      3.4
+// @version      3.5
 // @description  Reorganiza departamentos
 // @author       Julio Santos feat. AI
 // @match        https://www5.directtalk.com.br/admin/info/info_oper_editOperSite.asp*
 // @grant        GM_addStyle
 // @run-at       document-end
+// @downloadURL  https://raw.githubusercontent.com/JulioSantos-dss/HiPlatform-Enhancements/main/Hi%20-%20Gest%C3%A3o%20de%20Usu%C3%A1rio.user.js
+// @updateURL    https://raw.githubusercontent.com/JulioSantos-dss/HiPlatform-Enhancements/main/Hi%20-%20Gest%C3%A3o%20de%20Usu%C3%A1rio.user.js
 // ==/UserScript==
 
 (function() {
