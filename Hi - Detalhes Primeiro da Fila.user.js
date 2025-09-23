@@ -1,11 +1,13 @@
 // ==UserScript==
 // @name         Hi - Detalhes Primeiro da Fila
 // @namespace     http://tampermonkey.net/
-// @version      1.11
+// @version      1.2
 // @description  Show queue details in a collapsible menu with dynamic updates and first customer info on the dashboard
 // @author       Julio Santos feat. AI
 // @match        https://www5.directtalk.com.br/static/beta/admin/main.html*
 // @grant        GM_xmlhttpRequest
+// @downloadURL  https://raw.githubusercontent.com/JulioSantos-dss/HiPlatform-Enhancements/main/Hi%20-%20Detalhes%20Primeiro%20da%20Fila.user.js
+// @updateURL    https://raw.githubusercontent.com/JulioSantos-dss/HiPlatform-Enhancements/main/Hi%20-%20Detalhes%20Primeiro%20da%20Fila.user.js
 // ==/UserScript==
 
 (function() {
