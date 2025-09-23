@@ -49,7 +49,7 @@ function createSearchAndToggleButton() {
     searchToggleWrapper.setAttribute('data-userscript-filter', 'search-toggle-wrapper'); // Mark our element
 
     let toggleButton = document.createElement('button');
-    toggleButton.textContent = 'OI TAINARA';
+    toggleButton.textContent = 'Filtrar Operadores';
     toggleButton.style.padding = '10px 15px';
     toggleButton.style.backgroundColor = '#007bff';
     toggleButton.style.color = '#fff';
