@@ -6,6 +6,8 @@
 // @author       Julio Santos feat. AI & You
 // @match        https://www5.directtalk.com.br/static/beta/admin/main.html*
 // @grant        none
+// @downloadURL  https://github.com/JulioSantos-dss/HiPlatform-Enhancements/raw/refs/heads/main/Hi%20-%20Filtro%20de%20Operadores%20Logados-1.6.2%20(3).user.js
+// @updateURL    https://github.com/JulioSantos-dss/HiPlatform-Enhancements/raw/refs/heads/main/Hi%20-%20Filtro%20de%20Operadores%20Logados-1.6.2%20(3).user.js
 // ==/UserScript==
 
 (function() {
