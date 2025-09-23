@@ -1,12 +1,14 @@
 // ==UserScript==
 // @name         Hi - Finalizador de CNC
 // @namespace    http://tampermonkey.net/
-// @version      2.1
+// @version      2.2
 // @description  Automates response, classification, and finalization. Includes a check for active chats and an editable message via a settings modal with a restore option.
 // @author       Julio Santos feat. AI & Gemini
 // @match        https://app.hiplatform.com/agent/chat/attendance/*
 // @grant        GM_setValue
 // @grant        GM_getValue
+// @downloadURL  https://raw.githubusercontent.com/JulioSantos-dss/HiPlatform-Enhancements/main/Hi%20-%20Finalizador%20de%20CNC.user.js
+// @updateURL    https://raw.githubusercontent.com/JulioSantos-dss/HiPlatform-Enhancements/main/Hi%20-%20Finalizador%20de%20CNC.user.js
 // ==/UserScript==
 
 (function() {
