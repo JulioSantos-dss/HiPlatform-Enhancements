@@ -1,12 +1,14 @@
 // ==UserScript==
 // @name         Hi - Mapa de Atendimento
 // @namespace    http://tampermonkey.net/
-// @version      0.7
+// @version      1.0
 // @description  Displays department attendance chart with dynamic filtering; clicking a chart bar opens the corresponding "Janelas habilitadas" popup.
 // @match        https://www5.directtalk.com.br/static/beta/admin/main.html*
 // @grant        GM_addStyle
 // @require      https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js
 // @require      https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0
+// @downloadURL  https://raw.githubusercontent.com/JulioSantos-dss/HiPlatform-Enhancements/main/Hi%20-%20Mapa%20de%20Atendimento.user.js
+// @updateURL    https://raw.githubusercontent.com/JulioSantos-dss/HiPlatform-Enhancements/main/Hi%20-%20Mapa%20de%20Atendimento.user.js
 // ==/UserScript==
 
 /* global Chart, ChartDataLabels */
