@@ -1,12 +1,14 @@
 // ==UserScript==
 // @name         Hi - Mapa de Calor
 // @namespace    http://tampermonkey.net/
-// @version      0.9
+// @version      1.0
 // @description  Analyze and display department queue statistics
 // @match        https://www5.directtalk.com.br/admin/interactive/inter_home_userfila.asp*
 // @grant        GM_addStyle
 // @require      https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js
 // @require      https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0
+// @downloadURL  https://raw.githubusercontent.com/JulioSantos-dss/HiPlatform-Enhancements/main/Hi%20-%20Mapa%20de%20Calor.user.js
+// @updateURL    https://raw.githubusercontent.com/JulioSantos-dss/HiPlatform-Enhancements/main/Hi%20-%20Mapa%20de%20Calor.user.js
 // ==/UserScript==
 
 /* global Chart, ChartDataLabels */
