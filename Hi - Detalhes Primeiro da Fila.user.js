@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hi - Detalhes Primeiro da Fila
 // @namespace     http://tampermonkey.net/
-// @version      1.2
+// @version      1.3
 // @description  Show queue details in a collapsible menu with dynamic updates and first customer info on the dashboard
 // @author       Julio Santos feat. AI
 // @match        https://www5.directtalk.com.br/static/beta/admin/main.html*
@@ -164,33 +164,64 @@
             container = createCollapsibleMenu();
         }
 
-        if (!container) return;
+        if (!container) {
+            console.error('Detalhes Fila: Container element not found.');
+            return;
+        }
 
         container.innerHTML = '<div class="loading-indicator">Carregando...</div>';
 
         GM_xmlhttpRequest({
             method: 'GET',
             url: 'https://www5.directtalk.com.br/admin/interactive/inter_home_userfila.asp?id_departamento=-1&departamento=-1',
+
+            // --- START OF THE FIX ---
+            // Force the browser to interpret the response as ISO-8859-1, matching the page's encoding.
+            // This is the most critical change.
+            overrideMimeType: 'text/html; charset=iso-8859-1',
+            // --- END OF THE FIX ---
+
             onload: function(response) {
+                console.log('Detalhes Fila: Request successful. Processing response.');
+
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(response.responseText, 'text/html');
-
                 const rows = doc.querySelectorAll('table[cellspacing="1"] tr');
-                let firstCustomerInfo = {};
 
-                // Extract the first customer's info (assuming it's in the first few rows)
-                for (let i = 0; i < rows.length; i++) {
-                    const cells = rows[i].querySelectorAll('td font');
-                    if (cells.length === 2) {
-                        const label = cells[0].textContent.trim().replace(':', '');
-                        const value = cells[1].textContent.trim();
-                        firstCustomerInfo[label] = value;
+                console.log(`Detalhes Fila: Found ${rows.length} rows in the table.`);
+
+                const firstCustomerInfo = {};
+                let isCapturing = false;
+
+                for (const row of rows) {
+                    const cells = row.querySelectorAll('td font');
+                    if (cells.length !== 2) continue;
+
+                    const label = cells[0].textContent.trim();
+                    const value = cells[1].textContent.trim();
+
+                    if (label.includes('Posição na fila') && value === '1') {
+                        console.log('Detalhes Fila: Found start of first customer. Starting capture.');
+                        isCapturing = true;
                     }
-                    // Stop after extracting the first customer's info
-                    if (Object.keys(firstCustomerInfo).length >= 20) break; // Adjust this condition if needed
+
+                    if (isCapturing && label.includes('Posição na fila') && value !== '1') {
+                        console.log('Detalhes Fila: Found start of second customer. Stopping capture.');
+                        break;
+                    }
+
+                    if (isCapturing) {
+                        const cleanLabel = label.replace(':', '').trim();
+                        firstCustomerInfo[cleanLabel] = value;
+                    }
                 }
 
-                // Use firstCustomerInfo for the collapsible menu
+                console.log('Detalhes Fila: Final captured data:', firstCustomerInfo);
+
+                if (Object.keys(firstCustomerInfo).length === 0) {
+                    console.error('Detalhes Fila: Failed to capture any customer information. The parsing logic might have failed.');
+                }
+
                 const departmentValue = firstCustomerInfo['Departamento'] || 'N/A';
                 container.innerHTML = `
                     <div class="customer-item">
@@ -201,8 +232,10 @@
                     </div>
                 `;
 
-                // Update the main dashboard with the first customer's info
                 updateMainDashboard(firstCustomerInfo);
+            },
+            onerror: function(error) {
+                console.error('Detalhes Fila: GM_xmlhttpRequest failed.', error);
             }
         });
     }
@@ -212,19 +245,19 @@
         if (!dashboard) return;
 
         // Remove any existing first-customer-info element
-        const existingInfoElement = dashboard.querySelector('.first-customer-info');
+        let existingInfoElement = dashboard.querySelector('.first-customer-info');
         if (existingInfoElement) {
-            dashboard.removeChild(existingInfoElement);
+            existingInfoElement.remove();
         }
 
         // Create a new element to display the information
-//        const customerInfoElement = document.createElement('div');
-//       customerInfoElement.className = 'first-customer-info';
-//        customerInfoElement.innerHTML = `
-//            <div>Primeiro da fila: ${customerInfo['Nome'] || 'N/A'}</div>
-//            <div>Departamento: ${customerInfo['Departamento'] || 'N/A'}</div>
-//            <div>Entrada: ${customerInfo['Data Entrada'] || 'N/A'}</div>
-//        `;
+        /* const customerInfoElement = document.createElement('div');
+        customerInfoElement.className = 'first-customer-info';
+        customerInfoElement.innerHTML = `
+            <div>Primeiro da fila: ${customerInfo['Nome'] || 'N/A'}</div>
+            <div>Departamento: ${customerInfo['Departamento'] || 'N/A'}</div>
+            <div>Entrada: ${customerInfo['Data Entrada'] || 'N/A'}</div>
+        `; */
 
         // Add the new element to the dashboard
         dashboard.appendChild(customerInfoElement);
