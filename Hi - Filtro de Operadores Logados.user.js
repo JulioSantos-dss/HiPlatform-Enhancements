@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Hi - Filtro de Operadores Logados
 // @namespace    http://tampermonkey.net/
-// @version      1.9
+// @version      2.0
 // @description  Filtro de Operadores com Interface Moderna (Searchbox outside panel)
-// @author       Julio Santos feat. AI & You
+// @author       Julio Santos feat. AI
 // @match        https://www5.directtalk.com.br/static/beta/admin/main.html*
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/JulioSantos-dss/HiPlatform-Enhancements/main/Hi%20-%20Filtro%20de%20Operadores%20Logados.user.js
@@ -90,7 +90,7 @@ function createSearchAndToggleButton() {
     inputWrapper.style.display = 'flex';
     inputWrapper.style.alignItems = 'center';
 
-    let externalSearchInput = document.createElement('input');
+    externalSearchInput = document.createElement('input');
     externalSearchInput.type = 'text';
     externalSearchInput.id = 'externalOperatorSearch';
     externalSearchInput.placeholder = 'Buscar...';
@@ -251,8 +251,34 @@ function createSearchAndToggleButton() {
         updateCheckboxCounts();
     }
 
-    function saveCheckboxStates() { /* ... as before ... */ }
-    function loadCheckboxStates() { /* ... as before ... */ }
+    function saveCheckboxStates() {
+        console.log('[FilterScript] Saving checkbox states.'); // DEBUG
+        const states = {};
+        const checkboxes = document.querySelectorAll('#filterPanel input[type="checkbox"]');
+        checkboxes.forEach(checkbox => {
+            // Use the checkbox ID as the key, and its checked status as the value
+            states[checkbox.id] = checkbox.checked;
+        });
+        // localStorage can only store strings, so we convert the object to a JSON string
+        localStorage.setItem('checkboxStates', JSON.stringify(states));
+    }
+
+    function loadCheckboxStates() {
+        console.log('[FilterScript] Loading checkbox states.'); // DEBUG
+        const savedStates = localStorage.getItem('checkboxStates');
+        if (savedStates) {
+            // If we found saved states, parse the JSON string back into an object
+            const states = JSON.parse(savedStates);
+            for (const id in states) {
+                // Find the checkbox corresponding to each saved ID
+                const checkbox = document.getElementById(id);
+                if (checkbox) {
+                    // Restore its checked state
+                    checkbox.checked = states[id];
+                }
+            }
+        }
+    }
 
     function restoreOriginalState() {
         console.log('[FilterScript] restoreOriginalState called.'); // DEBUG
@@ -335,7 +361,7 @@ function createSearchAndToggleButton() {
     const applyFilterInterval = setInterval(() => {
         if (isCorrectPage() && externalSearchInput) { // Check if externalSearchInput is initialized
             // console.log('[FilterScript] Interval: Applying filter.'); // DEBUG (very noisy)
-            // applyFilter(externalSearchInput.value); // Re-applying filter periodically can be heavy. MutationObserver should handle most.
+            applyFilter(externalSearchInput.value); // Re-applying filter periodically can be heavy. MutationObserver should handle most.
             // Let's use this interval mainly for count updates if table content changes without DOM mutation (rare)
             updateCheckboxCounts();
         }
@@ -377,9 +403,9 @@ function createSearchAndToggleButton() {
 
         if (table) {
             console.log('[FilterScript] Table found. Creating UI elements.'); // DEBUG
-            createFilterPanel();       // Create panel first
-            createSearchAndToggleButton(); // Then button/search
-            if (typeof observeTable === "function") observeTable(); // Check if defined
+            createSearchAndToggleButton(); // Create the search box and load its value FIRST
+            createFilterPanel();           // Create the panel and apply the initial filter SECOND
+            if (typeof observeTable === "function") observeTable();
             uiInitialized = true;
             console.log('[FilterScript] UI Initialization complete. uiInitialized set to true.'); // DEBUG
         } else {
