@@ -1,11 +1,13 @@
 // ==UserScript==
 // @name         Bitrix - Exterminador de Notificações
 // @namespace    http://tampermonkey.net/
-// @version      0.6
+// @version      0.7
 // @description  Shows a "Dismiss All" icon on a notification when you hover over it.
 // @author       Julio Santos feat. AI
 // @match        https://cabonnet.bitrix24.com.br/*
 // @grant        GM_addStyle
+// @downloadURL  https://raw.githubusercontent.com/JulioSantos-dss/HiPlatform-Enhancements/main/Bitrix%20-%20Exterminador%20de%20Notifica%C3%A7%C3%B5es.user.js
+// @updateURL    https://raw.githubusercontent.com/JulioSantos-dss/HiPlatform-Enhancements/main/Bitrix%20-%20Exterminador%20de%20Notifica%C3%A7%C3%B5es.user.js
 // ==/UserScript==
 
 (function() {
