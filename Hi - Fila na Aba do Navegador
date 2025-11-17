@@ -1,0 +1,50 @@
+// ==UserScript==
+// @name         Hi - Fila na Aba do Navegador
+// @namespace    http://tampermonkey.net/
+// @version      0.2
+// @description  Shows the number of clients in the queue in the browser tab title using a specific selector.
+// @author       Julio Santos feat. AI
+// @match        https://www5.directtalk.com.br/static/beta/admin/main.html*
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    // Store the original title of the page
+    const originalTitle = document.title;
+
+    function updateTabTitleWithQueueCount() {
+        // The precise selector for the element containing the number
+        const selector = "#dt-style-content > div.row.animate.ng-scope > div.container.ng-scope > div:nth-child(4) > div.col-sm-12.padding-5.dt-chart-summary > div:nth-child(1) > div > strong";
+
+        // Find the specific element on the page
+        const queueElement = document.querySelector(selector);
+
+        // Check if the element was found
+        if (queueElement) {
+            // Get the number from the element's text
+            const queueCountText = queueElement.textContent.trim();
+            // Convert the text to a number to perform a comparison
+            const queueCountNumber = parseInt(queueCountText, 10);
+
+            // NEW: Only update the title if the number is greater than 0
+            if (queueCountNumber > 0) {
+                document.title = `(${queueCountText}) ${originalTitle}`;
+            } else {
+                // If the number is 0, revert to the original title
+                document.title = originalTitle;
+            }
+        } else {
+            // If the element isn't found for any reason, also revert to the original title
+            document.title = originalTitle;
+        }
+    }
+
+    // Run the function every 3 seconds (3000 milliseconds) to check for updates.
+    setInterval(updateTabTitleWithQueueCount, 3000);
+
+    // Run it once immediately on load
+    updateTabTitleWithQueueCount();
+
+})();
