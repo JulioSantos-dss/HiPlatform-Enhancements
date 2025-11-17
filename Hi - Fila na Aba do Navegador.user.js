@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hi - Fila na Aba do Navegador
 // @namespace    http://tampermonkey.net/
-// @version      0.2
+// @version      0.3
 // @description  Shows the number of clients in the queue in the browser tab title using a specific selector.
 // @author       Julio Santos feat. AI
 // @match        https://www5.directtalk.com.br/static/beta/admin/main.html*
@@ -15,36 +15,42 @@
 
     // Store the original title of the page
     const originalTitle = document.title;
+    // This is a selector for a higher-level container that is less likely to be replaced.
+    // This one points to the orange bar containing the queue info.
+    const stableParentSelector = "div.dt-chart-summary";
 
     function updateTabTitleWithQueueCount() {
-        // The precise selector for the element containing the number
-        const selector = "#dt-style-content > div.row.animate.ng-scope > div.container.ng-scope > div:nth-child(4) > div.col-sm-12.padding-5.dt-chart-summary > div:nth-child(1) > div > strong";
+        // First, find the stable parent container.
+        const parentElement = document.querySelector(stableParentSelector);
 
-        // Find the specific element on the page
-        const queueElement = document.querySelector(selector);
+        // If the parent container doesn't exist, do nothing and revert the title.
+        if (!parentElement) {
+            document.title = originalTitle;
+            return;
+        }
 
-        // Check if the element was found
+        // Now, look for the 'strong' element *inside* the parent container.
+        // This is much more reliable.
+        const queueElement = parentElement.querySelector("strong");
+
         if (queueElement) {
-            // Get the number from the element's text
             const queueCountText = queueElement.textContent.trim();
-            // Convert the text to a number to perform a comparison
             const queueCountNumber = parseInt(queueCountText, 10);
 
-            // NEW: Only update the title if the number is greater than 0
+            // Only update the title if the number is greater than 0
             if (queueCountNumber > 0) {
                 document.title = `(${queueCountText}) ${originalTitle}`;
             } else {
-                // If the number is 0, revert to the original title
                 document.title = originalTitle;
             }
         } else {
-            // If the element isn't found for any reason, also revert to the original title
+            // If the number can't be found inside the container, revert the title.
             document.title = originalTitle;
         }
     }
 
-    // Run the function every 3 seconds (3000 milliseconds) to check for updates.
-    setInterval(updateTabTitleWithQueueCount, 3000);
+    // Run the function every 2 seconds (2000 milliseconds) to be more responsive.
+    setInterval(updateTabTitleWithQueueCount, 2000);
 
     // Run it once immediately on load
     updateTabTitleWithQueueCount();
