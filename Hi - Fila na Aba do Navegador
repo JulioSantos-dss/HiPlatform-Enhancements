@@ -6,6 +6,8 @@
 // @author       Julio Santos feat. AI
 // @match        https://www5.directtalk.com.br/static/beta/admin/main.html*
 // @grant        none
+// @downloadURL  https://raw.githubusercontent.com/JulioSantos-dss/HiPlatform-Enhancements/main/Hi%20-%20Fila%20na%20Aba%20do%20Navegador.user.js
+// @updateURL    https://raw.githubusercontent.com/JulioSantos-dss/HiPlatform-Enhancements/main/Hi%20-%20Fila%20na%20Aba%20do%20Navegador.user.js
 // ==/UserScript==
 
 (function() {
