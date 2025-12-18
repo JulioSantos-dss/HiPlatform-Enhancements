@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hi - Fila na Aba do Navegador
 // @namespace    http://tampermonkey.net/
-// @version      0.3
+// @version      0.5
 // @description  Shows the number of clients in the queue in the browser tab title using a specific selector.
 // @author       Julio Santos feat. AI
 // @match        https://www5.directtalk.com.br/static/beta/admin/main.html*
