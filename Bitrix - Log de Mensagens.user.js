@@ -7,6 +7,9 @@
 // @match        https://*.bitrix24.com*/*
 // @match        https://*.bitrix24.com.br*/*
 // @match        https://*.bitrix24.net*/*
+// @downloadURL  https://raw.githubusercontent.com/JulioSantos-dss/HiPlatform-Enhancements/main/Bitrix%20-%20Log%20de%20Mensagens.user.js
+// @updateURL    https://raw.githubusercontent.com/JulioSantos-dss/HiPlatform-Enhancements/main/Bitrix%20-%20Log%20de%20Mensagens.user.js
+// ==/UserScript==
 // @grant        none
 // ==/UserScript==
 
