@@ -1,15 +1,14 @@
 // ==UserScript==
 // @name         Bitrix - Log de Mensagens
 // @namespace    http://tampermonkey.net/
-// @version      1.5
-// @description  Captures notifications, saves them on refresh, integrated chat button, clear function
+// @version      1.6
+// @description  Captura Notificações :)
 // @author       Julio Santos feat. AI
 // @match        https://*.bitrix24.com*/*
 // @match        https://*.bitrix24.com.br*/*
 // @match        https://*.bitrix24.net*/*
 // @downloadURL  https://raw.githubusercontent.com/JulioSantos-dss/HiPlatform-Enhancements/main/Bitrix%20-%20Log%20de%20Mensagens.user.js
 // @updateURL    https://raw.githubusercontent.com/JulioSantos-dss/HiPlatform-Enhancements/main/Bitrix%20-%20Log%20de%20Mensagens.user.js
-// ==/UserScript==
 // @grant        none
 // ==/UserScript==
 
