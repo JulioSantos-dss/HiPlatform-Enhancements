@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bitrix - Log de Mensagens
 // @namespace    http://tampermonkey.net/
-// @version      1.6
+// @version      1.7
 // @description  Captura Notificações :)
 // @author       Julio Santos feat. AI
 // @match        https://*.bitrix24.com*/*
@@ -17,15 +17,17 @@
 
     // --- Configuration ---
     const LOG_BTN_ID = 'bitrix-logger-custom-btn';
-    const STORAGE_KEY = 'bitrix_notification_logs'; // Key for Local Storage
+    const STORAGE_KEY_LOGS = 'bitrix_notification_logs'; // Key for Local Storage for logs
+    const STORAGE_KEY_MODAL_POS_X = 'bitrix_modal_pos_x'; // Key for Local Storage for modal X position
+    const STORAGE_KEY_MODAL_POS_Y = 'bitrix_modal_pos_y'; // Key for Local Storage for modal Y position
 
     // --- 1. Data Management ---
 
     let messageLog = [];
 
-    // Load from Local Storage on startup
+    // Load logs from Local Storage on startup
     try {
-        const storedData = localStorage.getItem(STORAGE_KEY);
+        const storedData = localStorage.getItem(STORAGE_KEY_LOGS);
         if (storedData) {
             messageLog = JSON.parse(storedData);
         }
@@ -35,7 +37,7 @@
 
     // Helper to save current state
     function saveLogs() {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(messageLog));
+        localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(messageLog));
     }
 
     // --- 2. UI Creation ---
@@ -43,9 +45,7 @@
     // Modal Container
     const modal = document.createElement('div');
     modal.style.display = 'none';
-    modal.style.position = 'fixed';
-    modal.style.bottom = '100px';
-    modal.style.right = '20px';
+    modal.style.position = 'fixed'; // Keep fixed for now, drag logic will update top/left
     modal.style.width = '350px';
     modal.style.height = '450px';
     modal.style.backgroundColor = 'white';
@@ -56,7 +56,7 @@
     modal.style.flexDirection = 'column';
     document.body.appendChild(modal);
 
-    // --- Modal Header ---
+    // --- Modal Header --- (This will be the draggable part)
     const header = document.createElement('div');
     header.style.padding = '10px';
     header.style.borderBottom = '1px solid #eee';
@@ -66,6 +66,7 @@
     header.style.display = 'flex';
     header.style.justifyContent = 'space-between';
     header.style.alignItems = 'center';
+    header.style.cursor = 'grab'; // Indicates draggable
     modal.appendChild(header);
 
     // Close "X" Button
@@ -74,10 +75,10 @@
     closeBtn.style.fontSize = '24px';
     closeBtn.style.fontWeight = 'bold';
     closeBtn.style.color = '#555';
-    closeBtn.style.cursor = 'pointer';
+    closeBtn.style.cursor = 'pointer'; // Override grab cursor for 'X'
     closeBtn.style.lineHeight = '20px';
     closeBtn.style.marginRight = '10px';
-    closeBtn.title = 'Close Window';
+    closeBtn.title = 'Fechar Janela';
     header.appendChild(closeBtn);
 
     // Title
@@ -85,18 +86,20 @@
     title.innerText = 'Log';
     title.style.fontWeight = 'bold';
     title.style.flexGrow = '1';
+    title.style.cursor = 'grab'; // Keep grab cursor for title area
     header.appendChild(title);
 
     // Button Container for Right Side
     const actionsDiv = document.createElement('div');
     actionsDiv.style.display = 'flex';
     actionsDiv.style.gap = '5px';
+    actionsDiv.style.cursor = 'default'; // Override grab cursor for buttons
     header.appendChild(actionsDiv);
 
     // Clear Logs Button (Trash Icon)
     const clearBtn = document.createElement('button');
     clearBtn.innerHTML = '🗑️';
-    clearBtn.title = 'Limpar todos os Logs';
+    clearBtn.title = 'Limpar Logs';
     clearBtn.style.fontSize = '14px';
     clearBtn.style.padding = '5px 8px';
     clearBtn.style.backgroundColor = '#dc3545'; // Red
@@ -128,7 +131,82 @@
     modal.appendChild(contentDiv);
 
 
-    // --- 3. Event Listeners ---
+    // --- 3. Modal Positioning and Drag Logic ---
+
+    let isDragging = false;
+    let offsetX, offsetY;
+
+    // Load saved position or set default
+    const savedX = localStorage.getItem(STORAGE_KEY_MODAL_POS_X);
+    const savedY = localStorage.getItem(STORAGE_KEY_MODAL_POS_Y);
+
+    if (savedX !== null && savedY !== null) {
+        modal.style.left = `${savedX}px`;
+        modal.style.top = `${savedY}px`;
+    } else {
+        // Default position if no saved position exists
+        modal.style.bottom = '100px';
+        modal.style.right = '20px';
+    }
+
+    // Drag start
+    header.addEventListener('mousedown', (e) => {
+        // Only start drag if left mouse button is pressed and not clicking on buttons/close 'X'
+        if (e.button === 0 && !e.target.closest('button, span.bx-im-dialog-chat-close-button')) {
+            isDragging = true;
+            header.style.cursor = 'grabbing'; // Change cursor while dragging
+
+            // Convert existing `right`/`bottom` styles to `left`/`top` if they are set
+            // This ensures consistent positioning for dragging calculations.
+            if (modal.style.right && !modal.style.left) {
+                const rect = modal.getBoundingClientRect();
+                modal.style.left = `${rect.left}px`;
+                modal.style.right = ''; // Clear right
+            }
+            if (modal.style.bottom && !modal.style.top) {
+                const rect = modal.getBoundingClientRect();
+                modal.style.top = `${rect.top}px`;
+                modal.style.bottom = ''; // Clear bottom
+            }
+
+            offsetX = e.clientX - modal.getBoundingClientRect().left;
+            offsetY = e.clientY - modal.getBoundingClientRect().top;
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+            e.preventDefault(); // Prevent text selection etc.
+        }
+    });
+
+    // Dragging
+    function onMouseMove(e) {
+        if (!isDragging) return;
+
+        let newX = e.clientX - offsetX;
+        let newY = e.clientY - offsetY;
+
+        // Keep modal within viewport boundaries
+        newX = Math.max(0, Math.min(newX, window.innerWidth - modal.offsetWidth));
+        newY = Math.max(0, Math.min(newY, window.innerHeight - modal.offsetHeight));
+
+        modal.style.left = `${newX}px`;
+        modal.style.top = `${newY}px`;
+    }
+
+    // Drag end
+    function onMouseUp() {
+        if (!isDragging) return;
+        isDragging = false;
+        header.style.cursor = 'grab'; // Reset cursor
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+
+        // Save new position to local storage
+        localStorage.setItem(STORAGE_KEY_MODAL_POS_X, modal.style.left.replace('px', ''));
+        localStorage.setItem(STORAGE_KEY_MODAL_POS_Y, modal.style.top.replace('px', ''));
+    }
+
+    // --- 4. Event Listeners for Buttons ---
 
     function toggleModal() {
         if (modal.style.display === 'none') {
@@ -144,7 +222,7 @@
 
     // Clear Logs Logic
     clearBtn.addEventListener('click', () => {
-        if(confirm("Tem certeza que deseja limpar todos os Logs")) {
+        if(confirm("Tem certeza que deseja limpar todos os Logs?")) {
             messageLog = []; // Clear array
             saveLogs(); // Save empty array to storage
             updateModalContent(); // Update UI
@@ -154,7 +232,7 @@
     function updateModalContent() {
         contentDiv.innerHTML = '';
         if (messageLog.length === 0) {
-            contentDiv.innerHTML = '<p style="color:#666; text-align:center; margin-top:20px;">Sem mensagens até o momento.</p>';
+            contentDiv.innerHTML = '<p style="color:#666; text-align:center; margin-top:20px;">No messages captured yet.</p>';
             return;
         }
 
@@ -203,7 +281,7 @@
         document.body.removeChild(link);
     }
 
-    // --- 4. Dynamic Button Injection ---
+    // --- 5. Dynamic Button Injection ---
 
     function tryInjectButton() {
         if (document.getElementById(LOG_BTN_ID)) return;
@@ -237,7 +315,7 @@
         }
     }
 
-    // --- 5. Logic to Capture Notifications ---
+    // --- 6. Logic to Capture Notifications ---
 
     function processNode(node) {
         if (node.classList && node.classList.contains('ui-notification-manager-browser-balloon')) {
@@ -249,18 +327,17 @@
             if (nameEl && msgEl) {
                 const nameText = nameEl.innerText.trim();
                 const msgText = msgEl.innerText.trim();
-                const timestamp = new Date().toLocaleString(); // Changed to full Date+Time string for persistence context
+                const timestamp = new Date().toLocaleString();
 
                 let imgSrc = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
                 if (imgEl && imgEl.src) imgSrc = imgEl.src;
 
-                // Duplicate Check: Check against the very last log entry
                 const lastLog = messageLog[messageLog.length - 1];
                 const isDuplicate = lastLog && lastLog.name === nameText && lastLog.message === msgText;
 
                 if (!isDuplicate) {
                     messageLog.push({ name: nameText, message: msgText, img: imgSrc, time: timestamp });
-                    saveLogs(); // <--- SAVE to Local Storage immediately
+                    saveLogs();
 
                     if (modal.style.display !== 'none') updateModalContent();
                 }
@@ -268,7 +345,7 @@
         }
     }
 
-    // --- 6. Observer ---
+    // --- 7. Observer ---
 
     const observer = new MutationObserver((mutations) => {
         tryInjectButton();
@@ -288,6 +365,7 @@
         subtree: true
     });
 
+    // Initial check in case chat is already open on load
     setTimeout(tryInjectButton, 1000);
 
 })();
