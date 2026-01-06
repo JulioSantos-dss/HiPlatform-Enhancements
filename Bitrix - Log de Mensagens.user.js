@@ -147,7 +147,7 @@
 
     // SAC Button
     const clearSacBtn = document.createElement('button');
-    clearSacBtn.innerText = 'Apagar SAC/HELP';
+    clearSacBtn.innerText = 'Apagar SAC/HELPs';
     clearSacBtn.title = 'Apagar da visualização';
     clearSacBtn.style.fontSize = '10px';
     clearSacBtn.style.padding = '5px 8px';
