@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bitrix - Log de Mensagens
 // @namespace    http://tampermonkey.net/
-// @version      1.7
+// @version      1.8
 // @description  Captura Notificações :)
 // @author       Julio Santos feat. AI
 // @match        https://*.bitrix24.com*/*
@@ -232,7 +232,7 @@
     function updateModalContent() {
         contentDiv.innerHTML = '';
         if (messageLog.length === 0) {
-            contentDiv.innerHTML = '<p style="color:#666; text-align:center; margin-top:20px;">No messages captured yet.</p>';
+            contentDiv.innerHTML = '<p style="color:#666; text-align:center; margin-top:20px;">Sem mensagens.</p>';
             return;
         }
 
