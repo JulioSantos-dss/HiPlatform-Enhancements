@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bitrix - Log de Mensagens
 // @namespace    http://tampermonkey.net/
-// @version      2.3
+// @version      2.4
 // @description  Captura Notificações, UI editável, CSV mantém histórico dos últimos 1000 registros
 // @author       Julio Santos feat. AI
 // @match        https://*.bitrix24.com*/*
