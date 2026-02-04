@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bitrix - Log de Mensagens
 // @namespace    http://tampermonkey.net/
-// @version      2.4
+// @version      2.5
 // @description  Captura Notificações, UI editável, CSV mantém histórico dos últimos 1000 registros
 // @author       Julio Santos feat. AI
 // @match        https://*.bitrix24.com*/*
@@ -19,13 +19,48 @@
     const LOG_BTN_ID = 'bitrix-logger-custom-btn';
 
     // Storage Keys
-    const STORAGE_KEY_UI_LOGS = 'bitrix_notification_logs_ui';   // For the visual window
+    const STORAGE_KEY_UI_LOGS = 'bitrix_notification_logs_ui';  // For the visual window
     const STORAGE_KEY_CSV_HIST = 'bitrix_notification_logs_csv'; // For the master history
     const STORAGE_KEY_MODAL_POS_X = 'bitrix_modal_pos_x';
     const STORAGE_KEY_MODAL_POS_Y = 'bitrix_modal_pos_y';
 
     // Limits
     const MAX_CSV_ENTRIES = 1000;
+
+    // --- 0. INTERCEPTAÇÃO DE DADOS (NOVO BLOCO) ---
+    // Armazena a última imagem recebida: { "NOME DO FULANO": "https://..." }
+    const imageBuffer = {};
+
+    function initBitrixHook() {
+        if (typeof BX !== 'undefined') {
+            console.log("✅ Bitrix Logger: Hook de Imagens Ativado");
+
+            BX.addCustomEvent("onPullEvent-im", function(command, params) {
+                // Monitora mensagens novas e busca arquivos de imagem
+                if ((command === 'message' || command === 'messageChat') && params.files) {
+                    Object.values(params.files).forEach(file => {
+                        // Verifica se é imagem e tem autor
+                        if ((file.type === 'image' || file.extension === 'png' || file.extension === 'jpg') && file.authorName) {
+                            const safeName = file.authorName.trim().toUpperCase();
+                            // Pega a URL de visualização real (urlShow) ou download
+                            const realUrl = file.urlShow || file.urlDownload;
+
+                            if (realUrl) {
+                                imageBuffer[safeName] = realUrl;
+                                // Limpa memória após 10s para evitar erros futuros
+                                setTimeout(() => { delete imageBuffer[safeName]; }, 10000);
+                            }
+                        }
+                    });
+                }
+            });
+        } else {
+            // Se o Bitrix ainda não carregou, tenta de novo em 2s
+            setTimeout(initBitrixHook, 2000);
+        }
+    }
+
+    initBitrixHook();
 
     // --- 1. Data Management ---
 
@@ -439,33 +474,48 @@
 
             if (nameEl && msgEl) {
                 const nameText = nameEl.innerText.trim();
-                const msgText = msgEl.innerText.trim();
+                let msgText = msgEl.innerText.trim();
                 const timestamp = new Date().toLocaleString();
 
-                let imgSrc = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
-                if (imgEl && imgEl.src) imgSrc = imgEl.src;
+                // Ícone padrão ou Avatar do usuário (não é a imagem enviada)
+                let avatarSrc = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+                if (imgEl && imgEl.src) avatarSrc = imgEl.src;
 
-                // Duplicate Check: Check against CSV History to ensure unique Master Record
-                const lastCsvLog = csvHistory[csvHistory.length - 1];
-                const isDuplicate = lastCsvLog && lastCsvLog.name === nameText && lastCsvLog.message === msgText;
+                // --- MODIFICAÇÃO: Verifica se temos a imagem real no Buffer ---
+                const isImageLabel = msgText.toLowerCase() === '[imagem]' || msgText === 'Imagem';
+
+                if (isImageLabel) {
+                    const safeName = nameText.toUpperCase();
+
+                    // Se capturamos o link real via Hook anteriormente:
+                    if (imageBuffer[safeName]) {
+                        const realUrl = imageBuffer[safeName];
+
+                        // Substitui o texto [Imagem] pela foto real
+                        msgText = `
+                            <a href="${realUrl}" target="_blank" title="Clique para ampliar">
+                                <img src="${realUrl}" style="max-width: 100%; max-height: 250px; border-radius: 6px; border: 1px solid #ccc; margin-top: 5px; display:block;">
+                            </a>
+                        `;
+                    }
+                }
+                // -------------------------------------------------------------
+
+                // Verifica Duplicidade
+                const last = csvHistory[csvHistory.length - 1];
+                const isDuplicate = last && last.name === nameText && last.message === msgText;
 
                 if (!isDuplicate) {
-                    const newEntry = { name: nameText, message: msgText, img: imgSrc, time: timestamp };
+                    const entry = { name: nameText, message: msgText, img: avatarSrc, time: timestamp };
 
-                    // 1. Add to UI Log
-                    uiLog.push(newEntry);
+                    uiLog.push(entry);
+                    if(uiLog.length > 200) uiLog.shift(); // Limite visual
 
-                    // 2. Add to CSV Master History
-                    csvHistory.push(newEntry);
-
-                    // 3. Enforce 1000 Limit on CSV History
-                    if (csvHistory.length > MAX_CSV_ENTRIES) {
-                        csvHistory.shift(); // Remove oldest
-                    }
+                    csvHistory.push(entry);
+                    if(csvHistory.length > 1000) csvHistory.shift(); // Limite CSV
 
                     saveAllLogs();
-
-                    if (modal.style.display !== 'none') updateModalContent();
+                    if(modal.style.display !== 'none') updateModalContent();
                 }
             }
         }
