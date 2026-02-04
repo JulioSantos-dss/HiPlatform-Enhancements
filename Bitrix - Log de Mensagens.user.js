@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bitrix - Log de Mensagens
 // @namespace    http://tampermonkey.net/
-// @version      2.5
+// @version      2.6
 // @description  Captura Notificações, UI editável, CSV mantém histórico dos últimos 1000 registros
 // @author       Julio Santos feat. AI
 // @match        https://*.bitrix24.com*/*
@@ -27,35 +27,48 @@
     // Limits
     const MAX_CSV_ENTRIES = 1000;
 
-    // --- 0. INTERCEPTAÇÃO DE DADOS (NOVO BLOCO) ---
-    // Armazena a última imagem recebida: { "NOME DO FULANO": "https://..." }
+    // --- 0. INTERCEPTAÇÃO DE DADOS (ATUALIZADO PARA IMAGENS E ADESIVOS) ---
     const imageBuffer = {};
 
     function initBitrixHook() {
         if (typeof BX !== 'undefined') {
-            console.log("✅ Bitrix Logger: Hook de Imagens Ativado");
+            console.log("✅ Bitrix Logger: Hook de Mídia Ativado (Imagens e Adesivos)");
 
             BX.addCustomEvent("onPullEvent-im", function(command, params) {
-                // Monitora mensagens novas e busca arquivos de imagem
-                if ((command === 'message' || command === 'messageChat') && params.files) {
-                    Object.values(params.files).forEach(file => {
-                        // Verifica se é imagem e tem autor
-                        if ((file.type === 'image' || file.extension === 'png' || file.extension === 'jpg') && file.authorName) {
-                            const safeName = file.authorName.trim().toUpperCase();
-                            // Pega a URL de visualização real (urlShow) ou download
-                            const realUrl = file.urlShow || file.urlDownload;
+                if (command === 'message' || command === 'messageChat') {
 
-                            if (realUrl) {
-                                imageBuffer[safeName] = realUrl;
-                                // Limpa memória após 10s para evitar erros futuros
-                                setTimeout(() => { delete imageBuffer[safeName]; }, 10000);
+                    // CENÁRIO A: Arquivos normais (Imagens enviadas via upload/colar)
+                    if (params.files) {
+                        Object.values(params.files).forEach(file => {
+                            if ((file.type === 'image' || file.extension === 'png' || file.extension === 'jpg') && file.authorName) {
+                                const safeName = file.authorName.trim().toUpperCase();
+                                const realUrl = file.urlShow || file.urlDownload;
+                                if (realUrl) {
+                                    imageBuffer[safeName] = realUrl;
+                                    setTimeout(() => { delete imageBuffer[safeName]; }, 10000);
+                                }
                             }
+                        });
+                    }
+
+                    // CENÁRIO B: Adesivos (Stickers)
+                    if (params.stickers && params.stickers.length > 0 && params.message && params.users) {
+                        const sticker = params.stickers[0]; // Pega o primeiro adesivo
+                        const senderId = params.message.senderId;
+                        const user = params.users[senderId]; // Busca os dados do usuário pelo ID
+
+                        if (sticker && sticker.uri && user && user.name) {
+                            const safeName = user.name.trim().toUpperCase();
+                            const stickerUrl = sticker.uri;
+
+                            // Salva no buffer igual fazemos com imagens
+                            imageBuffer[safeName] = stickerUrl;
+                            setTimeout(() => { delete imageBuffer[safeName]; }, 10000);
                         }
-                    });
+                    }
                 }
             });
         } else {
-            // Se o Bitrix ainda não carregou, tenta de novo em 2s
             setTimeout(initBitrixHook, 2000);
         }
     }
@@ -477,31 +490,31 @@
                 let msgText = msgEl.innerText.trim();
                 const timestamp = new Date().toLocaleString();
 
-                // Ícone padrão ou Avatar do usuário (não é a imagem enviada)
                 let avatarSrc = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
                 if (imgEl && imgEl.src) avatarSrc = imgEl.src;
 
-                // --- MODIFICAÇÃO: Verifica se temos a imagem real no Buffer ---
-                const isImageLabel = msgText.toLowerCase() === '[imagem]' || msgText === 'Imagem';
+                // --- MODIFICAÇÃO: Gatilhos para Imagem E Adesivo ---
+                const lowerMsg = msgText.toLowerCase();
+                const isMediaMsg = lowerMsg === '[imagem]' || msgText === 'Imagem' ||
+                                   lowerMsg === '[adesivo]' || msgText === 'Adesivo';
 
-                if (isImageLabel) {
+                if (isMediaMsg) {
                     const safeName = nameText.toUpperCase();
 
-                    // Se capturamos o link real via Hook anteriormente:
+                    // Verifica se temos algo no buffer para este usuário (seja imagem ou adesivo)
                     if (imageBuffer[safeName]) {
                         const realUrl = imageBuffer[safeName];
 
-                        // Substitui o texto [Imagem] pela foto real
+                        // Exibe a imagem/adesivo grande
                         msgText = `
                             <a href="${realUrl}" target="_blank" title="Clique para ampliar">
-                                <img src="${realUrl}" style="max-width: 100%; max-height: 250px; border-radius: 6px; border: 1px solid #ccc; margin-top: 5px; display:block;">
+                                <img src="${realUrl}" style="max-width: 100%; max-height: 250px; border-radius: 6px; border: 1px solid #ccc; margin-top: 5px; display:block; background-color: #f0f0f0;">
                             </a>
                         `;
                     }
                 }
-                // -------------------------------------------------------------
+                // ---------------------------------------------------
 
-                // Verifica Duplicidade
                 const last = csvHistory[csvHistory.length - 1];
                 const isDuplicate = last && last.name === nameText && last.message === msgText;
 
@@ -509,10 +522,10 @@
                     const entry = { name: nameText, message: msgText, img: avatarSrc, time: timestamp };
 
                     uiLog.push(entry);
-                    if(uiLog.length > 200) uiLog.shift(); // Limite visual
+                    if(uiLog.length > 200) uiLog.shift();
 
                     csvHistory.push(entry);
-                    if(csvHistory.length > 1000) csvHistory.shift(); // Limite CSV
+                    if(csvHistory.length > 1000) csvHistory.shift();
 
                     saveAllLogs();
                     if(modal.style.display !== 'none') updateModalContent();
