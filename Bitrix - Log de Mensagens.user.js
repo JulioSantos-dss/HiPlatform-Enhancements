@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bitrix - Log de Mensagens
 // @namespace    http://tampermonkey.net/
-// @version      2.8
+// @version      2.9
 // @description  Captura Notificações, UI editável, CSV mantém histórico dos últimos 1000 registros
 // @author       Julio Santos feat. AI
 // @match        https://*.bitrix24.com*/*
@@ -489,31 +489,44 @@
             const imgEl = node.querySelector('.ui-notification-manager-browser-icon');
 
             if (nameEl && msgEl) {
-                const nameText = nameEl.innerText.trim();
-                let msgText = msgEl.innerText.trim();
+                const titleText = nameEl.innerText.trim(); // Group Name or Sender Name
+                let msgText = msgEl.innerText.trim();      // "Sender: [Imagem]" or just "[Imagem]"
                 const timestamp = new Date().toLocaleString();
 
                 let avatarSrc = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
                 if (imgEl && imgEl.src) avatarSrc = imgEl.src;
 
-                // --- UPDATED LOGIC: Mixed Content (Text + Image/Sticker) ---
+                // --- LOGIC: Handle Groups & Direct Messages ---
                 const lowerMsg = msgText.toLowerCase();
-
-                // We check if the message *contains* the tag, instead of *being* the tag
                 const hasMediaTag = lowerMsg.includes('imagem') || lowerMsg.includes('adesivo');
 
                 if (hasMediaTag) {
-                    const safeName = nameText.toUpperCase();
+                    // 1. Determine who sent the message
+                    let senderName = titleText; // Default: The title is the sender (DM)
 
-                    // Check if we captured the URL in the buffer
+                    // Check for Group Pattern: "Name: [Imagem]"
+                    // We look for a colon (:). If found, the part before it is likely the sender.
+                    if (msgText.includes(':')) {
+                        const parts = msgText.split(':');
+                        // Heuristic: If the first part is reasonably short (a name), assume it's the sender
+                        if (parts.length > 1 && parts[0].length < 50) {
+                            senderName = parts[0].trim();
+                        }
+                    }
+
+                    const safeName = senderName.toUpperCase();
+
+                    // 2. Check Buffer using the determined Sender Name
                     if (imageBuffer[safeName]) {
                         const realUrl = imageBuffer[safeName];
 
-                        // 1. Remove the tag "[Imagem]" or "[Adesivo]" from the text to clean it up
-                        // Regex explanation: Matches [Imagem], [imagem], Imagem, [Adesivo], etc.
-                        let caption = msgText.replace(/\[?(imagem|adesivo)\]?/gi, '').trim();
+                        // Clean up text: Remove "[Imagem]" and "Sender Name:" from the display text
+                        // Regex removes: "Name:", "[Imagem]", "[Adesivo]"
+                        let caption = msgText
+                            .replace(new RegExp(`^${senderName}:`, 'i'), '') // Remove "Pedro:" prefix
+                            .replace(/\[?(imagem|adesivo)\]?/gi, '')         // Remove tags
+                            .trim();
 
-                        // 2. Build the HTML: Caption (if exists) + Image
                         msgText = `
                             ${caption ? `<div style="margin-bottom: 5px; color: #333;">${caption}</div>` : ''}
                             <a href="${realUrl}" target="_blank" title="Open Image">
@@ -524,12 +537,12 @@
                 }
                 // -----------------------------------------------------------
 
-                // Duplicate Check
+                // Duplicate Check (Compare against the visible title, not necessarily the sender)
                 const last = csvHistory[csvHistory.length - 1];
-                const isDuplicate = last && last.name === nameText && last.message === msgText;
+                const isDuplicate = last && last.name === titleText && last.message === msgText;
 
                 if (!isDuplicate) {
-                    const entry = { name: nameText, message: msgText, img: avatarSrc, time: timestamp };
+                    const entry = { name: titleText, message: msgText, img: avatarSrc, time: timestamp };
 
                     uiLog.push(entry);
                     if(uiLog.length > 200) uiLog.shift();
