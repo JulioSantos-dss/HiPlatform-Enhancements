@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bitrix - Log de Mensagens
 // @namespace    http://tampermonkey.net/
-// @version      2.7
+// @version      2.8
 // @description  Captura Notificações, UI editável, CSV mantém histórico dos últimos 1000 registros
 // @author       Julio Santos feat. AI
 // @match        https://*.bitrix24.com*/*
@@ -331,7 +331,10 @@
     // Clear SAC/HELP from Visual (Does NOT affect CSV History)
     clearSacBtn.addEventListener('click', () => {
         const originalCount = uiLog.length;
-        uiLog = uiLog.filter(log => !log.message.toLowerCase().includes('sac/help'));
+        uiLog = uiLog.filter(log =>
+                             !log.message.toLowerCase().includes('sac/help') &&
+                             !log.message.toLowerCase().includes('nome:')
+                            );
         if (originalCount !== uiLog.length) {
             saveAllLogs();
             updateModalContent();
