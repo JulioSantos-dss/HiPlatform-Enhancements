@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bitrix - Log de Mensagens
 // @namespace    http://tampermonkey.net/
-// @version      2.6
+// @version      2.7
 // @description  Captura Notificações, UI editável, CSV mantém histórico dos últimos 1000 registros
 // @author       Julio Santos feat. AI
 // @match        https://*.bitrix24.com*/*
@@ -493,28 +493,35 @@
                 let avatarSrc = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
                 if (imgEl && imgEl.src) avatarSrc = imgEl.src;
 
-                // --- MODIFICAÇÃO: Gatilhos para Imagem E Adesivo ---
+                // --- UPDATED LOGIC: Mixed Content (Text + Image/Sticker) ---
                 const lowerMsg = msgText.toLowerCase();
-                const isMediaMsg = lowerMsg === '[imagem]' || msgText === 'Imagem' ||
-                                   lowerMsg === '[adesivo]' || msgText === 'Adesivo';
 
-                if (isMediaMsg) {
+                // We check if the message *contains* the tag, instead of *being* the tag
+                const hasMediaTag = lowerMsg.includes('imagem') || lowerMsg.includes('adesivo');
+
+                if (hasMediaTag) {
                     const safeName = nameText.toUpperCase();
 
-                    // Verifica se temos algo no buffer para este usuário (seja imagem ou adesivo)
+                    // Check if we captured the URL in the buffer
                     if (imageBuffer[safeName]) {
                         const realUrl = imageBuffer[safeName];
 
-                        // Exibe a imagem/adesivo grande
+                        // 1. Remove the tag "[Imagem]" or "[Adesivo]" from the text to clean it up
+                        // Regex explanation: Matches [Imagem], [imagem], Imagem, [Adesivo], etc.
+                        let caption = msgText.replace(/\[?(imagem|adesivo)\]?/gi, '').trim();
+
+                        // 2. Build the HTML: Caption (if exists) + Image
                         msgText = `
-                            <a href="${realUrl}" target="_blank" title="Clique para ampliar">
-                                <img src="${realUrl}" style="max-width: 100%; max-height: 250px; border-radius: 6px; border: 1px solid #ccc; margin-top: 5px; display:block; background-color: #f0f0f0;">
+                            ${caption ? `<div style="margin-bottom: 5px; color: #333;">${caption}</div>` : ''}
+                            <a href="${realUrl}" target="_blank" title="Open Image">
+                                <img src="${realUrl}" style="max-width: 100%; max-height: 250px; border-radius: 6px; border: 1px solid #ccc; display:block; background-color: #f5f5f5;">
                             </a>
                         `;
                     }
                 }
-                // ---------------------------------------------------
+                // -----------------------------------------------------------
 
+                // Duplicate Check
                 const last = csvHistory[csvHistory.length - 1];
                 const isDuplicate = last && last.name === nameText && last.message === msgText;
 
