@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Bitrix - Log de Mensagens
 // @namespace    http://tampermonkey.net/
-// @version      3.6
-// @description  Captura Notificações, UI editável, CSV mantém histórico. Adicionado efeito hover robusto.
+// @version      3.9
+// @description  Captura Notificações, UI editável, CSV mantém histórico.
 // @author       Julio Santos feat. AI
 // @match        https://*.bitrix24.com*/*
 // @match        https://*.bitrix24.com.br*/*
@@ -552,7 +552,12 @@
                     return;
                 }
 
-                let html = `<div style="border-bottom:1px solid #eee; margin-bottom:10px; padding-bottom:5px; font-weight:bold; color:#007bff; font-size:12px;">Últimas ${SPY_MESSAGE_LIMIT} Mensagens</div>`;
+                let html = `
+                <div style="position:sticky; top:-10px; background:white; z-index:100; margin:-10px -10px 10px -10px; padding:10px 10px 5px 10px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee;">
+                    <span style="font-weight:bold; color:#007bff; font-size:12px;">Últimas ${SPY_MESSAGE_LIMIT} Mensagens</span>
+                    <span id="spy-close-btn" style="cursor:pointer; font-weight:bold; color:#555; font-size:24px; line-height:1;">&times;</span>
+                </div>
+                `;
 
                 messages.forEach(msg => {
                     const authorName = userMap[msg.author_id] || "ID: " + msg.author_id;
@@ -607,7 +612,17 @@
                         </div>
                     `;
                 });
+
                 spyModal.innerHTML = html;
+
+                // Adiciona o evento de click no botão de fechar recém-criado
+                const btnClose = spyModal.querySelector('#spy-close-btn');
+                if(btnClose) {
+                    btnClose.addEventListener('click', function(e) {
+                         e.stopPropagation();
+                         spyModal.style.display = 'none';
+                    });
+                }
             }
         });
     }
