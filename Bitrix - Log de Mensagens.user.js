@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Bitrix - Log de Mensagens
 // @namespace    http://tampermonkey.net/
-// @version      3.9
-// @description  Captura Notificações, UI editável, CSV mantém histórico.
+// @version      4.0
+// @description  Captura Notificações, UI editável, CSV mantém histórico. Janela espiã maior com avatares.
 // @author       Julio Santos feat. AI
 // @match        https://*.bitrix24.com*/*
 // @match        https://*.bitrix24.com.br*/*
@@ -155,7 +155,8 @@
     // --- ESPIÃO: Janela Flutuante ---
     const spyModal = document.createElement('div');
     spyModal.id = 'bitrix-spy-modal';
-    spyModal.style.cssText = 'display:none; position:fixed; width:350px; max-height:400px; background:white; border:1px solid #ccc; z-index:100001; border-radius:6px; box-shadow:0 5px 20px rgba(0,0,0,0.3); overflow-y:auto; padding:10px; font-family:OpenSans, Arial; font-size:13px; color:#333; text-align:left;';
+    // Increased Width to 450px and Max-Height to 600px
+    spyModal.style.cssText = 'display:none; position:fixed; width:450px; max-height:600px; background:white; border:1px solid #ccc; z-index:100001; border-radius:6px; box-shadow:0 5px 20px rgba(0,0,0,0.3); overflow-y:auto; padding:10px; font-family:OpenSans, Arial; font-size:14px; color:#333; text-align:left;';
     document.body.appendChild(spyModal);
 
     document.addEventListener('click', (e) => {
@@ -510,7 +511,7 @@
 
         // --- CORREÇÃO DE POSIÇÃO (Smart Positioning) ---
         // Se a janela for ficar cortada embaixo, sobe ela
-        const estimatedHeight = 400; // max-height definida no CSS
+        const estimatedHeight = 600; // Updated max-height defined in CSS
         let finalY = y;
 
         if (y + estimatedHeight > window.innerHeight) {
@@ -544,8 +545,14 @@
                     }
                 });
 
+                // Map of Users (ID -> {name, avatar})
                 const userMap = {};
-                users.forEach(u => { userMap[u.id] = u.name; });
+                users.forEach(u => {
+                    userMap[u.id] = {
+                        name: u.name,
+                        avatar: u.avatar || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'
+                    };
+                });
 
                 if (messages.length === 0) {
                     spyModal.innerHTML = '<div style="padding:10px;">Vazio.</div>';
@@ -560,7 +567,9 @@
                 `;
 
                 messages.forEach(msg => {
-                    const authorName = userMap[msg.author_id] || "ID: " + msg.author_id;
+                    const user = userMap[msg.author_id] || { name: "ID: " + msg.author_id, avatar: 'https://cdn-icons-png.flaticon.com/512/149/149071.png' };
+                    const authorName = user.name;
+                    const avatarUrl = user.avatar;
                     const date = new Date(msg.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
                     let contentHtml = msg.text ? msg.text.replace(/\n/g, '<br>') : '';
@@ -603,12 +612,17 @@
                     }
 
                     html += `
-                        <div style="margin-bottom:8px; border-bottom:1px solid #f0f0f0; padding-bottom:5px;">
-                            <div style="font-size:10px; color:#888; display:flex; justify-content:space-between;">
-                                <span style="font-weight:bold; color:#555">${authorName}</span>
-                                <span>${date}</span>
+                        <div style="margin-bottom:10px; border-bottom:1px solid #f0f0f0; padding-bottom:10px; display:flex; align-items:flex-start;">
+                            <div style="margin-right:10px; flex-shrink:0;">
+                                <img src="${avatarUrl}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; border:1px solid #eee;">
                             </div>
-                            <div style="color:#222; margin-top:2px; font-size:12px; line-height:1.4;">${contentHtml}</div>
+                            <div style="flex-grow:1;">
+                                <div style="font-size:12px; color:#888; display:flex; justify-content:space-between; margin-bottom:2px;">
+                                    <span style="font-weight:bold; color:#555; font-size:13px;">${authorName}</span>
+                                    <span>${date}</span>
+                                </div>
+                                <div style="color:#222; font-size:14px; line-height:1.4;">${contentHtml}</div>
+                            </div>
                         </div>
                     `;
                 });
