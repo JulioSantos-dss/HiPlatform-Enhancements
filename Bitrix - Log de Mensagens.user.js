@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Bitrix - Log de Mensagens
 // @namespace    http://tampermonkey.net/
-// @version      2.9
-// @description  Captura Notificações, UI editável, CSV mantém histórico dos últimos 1000 registros
+// @version      3.6
+// @description  Captura Notificações, UI editável, CSV mantém histórico. Ordem invertida e limite configurável.
 // @author       Julio Santos feat. AI
 // @match        https://*.bitrix24.com*/*
 // @match        https://*.bitrix24.com.br*/*
@@ -15,19 +15,32 @@
 (function() {
     'use strict';
 
+    // --- CONFIGURAÇÃO DE SELETORES (COMPATIBILIDADE) ---
+    // Usamos isso apenas para encontrar o CONTADOR, já que a linha buscamos por [data-id]
+    const SELECTORS = {
+        COUNTERS: [
+            '.bx-im-list-recent-item__counters_wrap', // Padrão antigo
+            '.bx-im-recent-item-counter-wrap',      // Padrão novo
+            '[data-role="counter"]',                // Padrão genérico Vue
+            '.bx-im-counter',
+            '.bx-im-roster-item-counter-wrap'       // Variação possível
+        ]
+    };
+
     // --- Configuration ---
     const LOG_BTN_ID = 'bitrix-logger-custom-btn';
+    const SPY_MESSAGE_LIMIT = 25; // <--- ALTERE AQUI O NÚMERO DE MENSAGENS (ex: 20, 50)
 
     // Storage Keys
-    const STORAGE_KEY_UI_LOGS = 'bitrix_notification_logs_ui';  // For the visual window
-    const STORAGE_KEY_CSV_HIST = 'bitrix_notification_logs_csv'; // For the master history
+    const STORAGE_KEY_UI_LOGS = 'bitrix_notification_logs_ui';
+    const STORAGE_KEY_CSV_HIST = 'bitrix_notification_logs_csv';
     const STORAGE_KEY_MODAL_POS_X = 'bitrix_modal_pos_x';
     const STORAGE_KEY_MODAL_POS_Y = 'bitrix_modal_pos_y';
 
     // Limits
     const MAX_CSV_ENTRIES = 1000;
 
-    // --- 0. INTERCEPTAÇÃO DE DADOS (ATUALIZADO PARA IMAGENS E ADESIVOS) ---
+    // --- 0. INTERCEPTAÇÃO DE DADOS ---
     const imageBuffer = {};
 
     function initBitrixHook() {
@@ -37,7 +50,7 @@
             BX.addCustomEvent("onPullEvent-im", function(command, params) {
                 if (command === 'message' || command === 'messageChat') {
 
-                    // CENÁRIO A: Arquivos normais (Imagens enviadas via upload/colar)
+                    // CENÁRIO A: Arquivos normais
                     if (params.files) {
                         Object.values(params.files).forEach(file => {
                             if ((file.type === 'image' || file.extension === 'png' || file.extension === 'jpg') && file.authorName) {
@@ -51,17 +64,15 @@
                         });
                     }
 
-                    // CENÁRIO B: Adesivos (Stickers)
+                    // CENÁRIO B: Adesivos
                     if (params.stickers && params.stickers.length > 0 && params.message && params.users) {
-                        const sticker = params.stickers[0]; // Pega o primeiro adesivo
+                        const sticker = params.stickers[0];
                         const senderId = params.message.senderId;
-                        const user = params.users[senderId]; // Busca os dados do usuário pelo ID
+                        const user = params.users[senderId];
 
                         if (sticker && sticker.uri && user && user.name) {
                             const safeName = user.name.trim().toUpperCase();
                             const stickerUrl = sticker.uri;
-
-                            // Salva no buffer igual fazemos com imagens
                             imageBuffer[safeName] = stickerUrl;
                             setTimeout(() => { delete imageBuffer[safeName]; }, 10000);
                         }
@@ -77,22 +88,18 @@
 
     // --- 1. Data Management ---
 
-    let uiLog = [];       // What the user sees
-    let csvHistory = [];  // What the user exports (Master Record)
+    let uiLog = [];
+    let csvHistory = [];
 
-    // Load logs
     try {
         const storedUi = localStorage.getItem(STORAGE_KEY_UI_LOGS);
         const storedCsv = localStorage.getItem(STORAGE_KEY_CSV_HIST);
-
         if (storedUi) uiLog = JSON.parse(storedUi);
         if (storedCsv) csvHistory = JSON.parse(storedCsv);
-
     } catch (e) {
         console.error("Bitrix Logger: Error loading logs", e);
     }
 
-    // Save both logs
     function saveAllLogs() {
         localStorage.setItem(STORAGE_KEY_UI_LOGS, JSON.stringify(uiLog));
         localStorage.setItem(STORAGE_KEY_CSV_HIST, JSON.stringify(csvHistory));
@@ -100,7 +107,7 @@
 
     // --- 2. UI Creation ---
 
-    // Context Menu (Right Click)
+    // Context Menu
     const contextMenu = document.createElement('div');
     contextMenu.style.display = 'none';
     contextMenu.style.position = 'fixed';
@@ -127,7 +134,19 @@
 
     document.addEventListener('click', () => { contextMenu.style.display = 'none'; });
 
-    // Modal
+    // --- ESPIÃO: Janela Flutuante ---
+    const spyModal = document.createElement('div');
+    spyModal.id = 'bitrix-spy-modal';
+    spyModal.style.cssText = 'display:none; position:fixed; width:350px; max-height:400px; background:white; border:1px solid #ccc; z-index:100001; border-radius:6px; box-shadow:0 5px 20px rgba(0,0,0,0.3); overflow-y:auto; padding:10px; font-family:OpenSans, Arial; font-size:13px; color:#333; text-align:left;';
+    document.body.appendChild(spyModal);
+
+    document.addEventListener('click', (e) => {
+        if (spyModal.style.display !== 'none' && !spyModal.contains(e.target) && !e.target.classList.contains('bitrix-spy-eye')) {
+            spyModal.style.display = 'none';
+        }
+    });
+
+    // Modal Principal
     const modal = document.createElement('div');
     modal.style.display = 'none';
     modal.style.position = 'fixed';
@@ -141,7 +160,6 @@
     modal.style.flexDirection = 'column';
     document.body.appendChild(modal);
 
-    // Header
     const header = document.createElement('div');
     header.style.padding = '10px';
     header.style.borderBottom = '1px solid #eee';
@@ -180,7 +198,7 @@
     actionsDiv.style.cursor = 'default';
     header.appendChild(actionsDiv);
 
-    // Trash Button
+    // Botões
     const clearBtn = document.createElement('button');
     clearBtn.innerHTML = '🗑️';
     clearBtn.title = 'Limpar Logs (Visual)';
@@ -193,7 +211,6 @@
     clearBtn.style.cursor = 'pointer';
     actionsDiv.appendChild(clearBtn);
 
-    // SAC Button
     const clearSacBtn = document.createElement('button');
     clearSacBtn.innerText = 'Apagar SAC/HELPs';
     clearSacBtn.title = 'Apagar da visualização';
@@ -207,7 +224,6 @@
     clearSacBtn.style.fontWeight = 'bold';
     actionsDiv.appendChild(clearSacBtn);
 
-    // Export Button
     const exportBtn = document.createElement('button');
     exportBtn.innerText = 'CSV';
     exportBtn.title = 'Exportar Histórico Completo (1000)';
@@ -220,7 +236,6 @@
     exportBtn.style.cursor = 'pointer';
     actionsDiv.appendChild(exportBtn);
 
-    // Content
     const contentDiv = document.createElement('div');
     contentDiv.style.flex = '1';
     contentDiv.style.overflowY = 'auto';
@@ -228,9 +243,7 @@
     contentDiv.style.padding = '10px';
     modal.appendChild(contentDiv);
 
-
     // --- 3. Positioning Logic ---
-
     let isDragging = false;
     let offsetX, offsetY;
 
@@ -304,7 +317,6 @@
         localStorage.setItem(STORAGE_KEY_MODAL_POS_Y, modal.style.top.replace('px', ''));
     }
 
-
     // --- 4. Event Listeners ---
 
     function toggleModal() {
@@ -319,7 +331,6 @@
     closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
     exportBtn.addEventListener('click', exportToCsv);
 
-    // Clear Visual Logs (Does NOT affect CSV History)
     clearBtn.addEventListener('click', () => {
         if(confirm("Limpar a visualização atual?\n(O histórico do CSV será mantido)")) {
             uiLog = [];
@@ -328,7 +339,6 @@
         }
     });
 
-    // Clear SAC/HELP from Visual (Does NOT affect CSV History)
     clearSacBtn.addEventListener('click', () => {
         const originalCount = uiLog.length;
         uiLog = uiLog.filter(log =>
@@ -404,28 +414,22 @@
     }
 
     function deleteSingleMessage(index) {
-        // Removes only from UI log
         uiLog.splice(index, 1);
         saveAllLogs();
         updateModalContent();
     }
 
     function exportToCsv() {
-        // EXPORT FROM CSV HISTORY, NOT UI LOG
         if (csvHistory.length === 0) {
             alert("Histórico CSV vazio!");
             return;
         }
         let csvContent = "Time,Name,Message\n";
-
-        // Export newest first for better readability in Excel, or standard order?
-        // Usually CSVs are appended, but let's reverse to show newest on top like the UI
         [...csvHistory].reverse().forEach(row => {
             const safeMessage = row.message.replace(/"/g, '""');
             const safeName = row.name.replace(/"/g, '""');
             csvContent += `"${row.time}","${safeName}","${safeMessage}"\n`;
         });
-
         const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
         const url = URL.createObjectURL(blob);
@@ -479,6 +483,207 @@
         }
     }
 
+    // --- ESPIÃO: Busca Mensagens ---
+    function fetchSpyMessages(dialogId, x, y) {
+        if (!dialogId) return;
+
+        spyModal.innerHTML = '<div style="text-align:center; padding:20px; color:#666;">Carregando...</div>';
+        spyModal.style.display = 'block';
+
+        // --- CORREÇÃO DE POSIÇÃO (Smart Positioning) ---
+        // Se a janela for ficar cortada embaixo, sobe ela
+        const estimatedHeight = 400; // max-height definida no CSS
+        let finalY = y;
+
+        if (y + estimatedHeight > window.innerHeight) {
+             // Alinha com a parte de baixo da tela com uma margem de 20px
+             finalY = window.innerHeight - estimatedHeight - 20;
+             // Garante que não suba demais (teto)
+             if (finalY < 10) finalY = 10;
+        }
+
+        spyModal.style.left = x + 'px';
+        spyModal.style.top = finalY + 'px';
+        // ------------------------------------------------
+
+        BX.rest.callMethod('im.dialog.messages.get', {
+            'DIALOG_ID': dialogId,
+            'LIMIT': SPY_MESSAGE_LIMIT
+        }, function(result) {
+            if (result.error()) {
+                spyModal.innerHTML = '<div style="color:red; padding:10px;">Erro: ' + result.error() + '</div>';
+            } else {
+                const data = result.data();
+                const messages = data.messages;
+                const users = data.users || [];
+                // CORREÇÃO: Converter lista numérica para Objeto Map
+                const rawFiles = data.files || {};
+                const files = {};
+                // Varre o objeto/array original e remapeia usando o ID real do arquivo como chave
+                Object.values(rawFiles).forEach(f => {
+                    if (f && f.id) {
+                        files[f.id] = f;
+                    }
+                });
+
+                const userMap = {};
+                users.forEach(u => { userMap[u.id] = u.name; });
+
+                if (messages.length === 0) {
+                    spyModal.innerHTML = '<div style="padding:10px;">Vazio.</div>';
+                    return;
+                }
+
+                let html = `<div style="border-bottom:1px solid #eee; margin-bottom:10px; padding-bottom:5px; font-weight:bold; color:#007bff; font-size:12px;">Últimas ${SPY_MESSAGE_LIMIT} Mensagens</div>`;
+
+                messages.forEach(msg => {
+                    const authorName = userMap[msg.author_id] || "ID: " + msg.author_id;
+                    const date = new Date(msg.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+                    let contentHtml = msg.text ? msg.text.replace(/\n/g, '<br>') : '';
+
+                    // 1. Tenta recuperar Arquivos (Imagens Normais)
+                    if (msg.params && msg.params.FILE_ID) {
+                        const fileIds = Array.isArray(msg.params.FILE_ID) ? msg.params.FILE_ID : [msg.params.FILE_ID];
+                        fileIds.forEach(fId => {
+                            if (files[fId]) {
+                                const file = files[fId];
+                                if (file.type === 'image' || (file.name && file.name.match(/\.(jpg|jpeg|png|gif|webp)$/i))) {
+                                    const imgUrl = file.urlShow || file.urlDownload;
+                                    contentHtml += `<div style="margin-top:5px;"><a href="${file.urlDownload}" target="_blank"><img src="${imgUrl}" style="max-width:100%; max-height:150px; border-radius:4px; border:1px solid #eee;"></a></div>`;
+                                } else {
+                                    contentHtml += `<div style="margin-top:5px; font-size:11px;">📎 <a href="${file.urlDownload}" target="_blank">${file.name}</a></div>`;
+                                }
+                            } else {
+                                // Se ainda não achou, mostra warning no console (não deve mais acontecer com o fix acima)
+                                console.warn(`Bitrix Logger: Arquivo ID ${fId} não encontrado.`);
+                                contentHtml += `<div style="margin-top:5px; font-size:11px; color:#d9534f;">⚠️ Arquivo ID: ${fId} (Metadados indisponíveis)</div>`;
+                            }
+                        });
+                    }
+
+                    // 2. Tenta recuperar Adesivos (Stickers) - NOVO
+                    if (msg.params && msg.params.STICKER_ID) {
+                        // O Bitrix às vezes não manda a URL do adesivo aqui, mas indica que é um adesivo
+                        contentHtml += '<div style="margin-top:5px; color:#666; font-style:italic; background:#f0f0f0; padding:2px 5px; border-radius:3px; display:inline-block;">[Adesivo]</div>';
+                    }
+
+                    // 3. Tenta recuperar Anexos Ricos (Rich Attachments) - NOVO
+                    if (msg.params && msg.params.ATTACH) {
+                         contentHtml += '<div style="margin-top:5px; color:#666; font-style:italic;">[Anexo/Card]</div>';
+                    }
+
+                    // 4. Debug Fallback (Se continuar vazio, avisa para olhar o console)
+                    if (!contentHtml && msg.text === '') {
+                        console.log("🔍 BITRIX DEBUG (Msg sem conteúdo):", msg);
+                        contentHtml = '<i style="color:#999; cursor:help;" title="Abra o console (F12) para ver detalhes">[Conteúdo não suportado - Ver Console]</i>';
+                    }
+
+                    html += `
+                        <div style="margin-bottom:8px; border-bottom:1px solid #f0f0f0; padding-bottom:5px;">
+                            <div style="font-size:10px; color:#888; display:flex; justify-content:space-between;">
+                                <span style="font-weight:bold; color:#555">${authorName}</span>
+                                <span>${date}</span>
+                            </div>
+                            <div style="color:#222; margin-top:2px; font-size:12px; line-height:1.4;">${contentHtml}</div>
+                        </div>
+                    `;
+                });
+                spyModal.innerHTML = html;
+            }
+        });
+    }
+
+    // --- ESPIÃO: Injetor de Botões (Versão Restaurada & Híbrida) ---
+    function injectSpyButtons() {
+        // 1. LIMPEZA: Remove olhos de conversas que foram LIDAS
+        const existingEyes = document.querySelectorAll('.bitrix-spy-eye');
+        existingEyes.forEach(eye => {
+            const parentRow = eye.closest('[data-id], .bx-im-list-recent-item_wrap, [data-role="recent_item"]');
+            if (parentRow) {
+                // Tenta achar contador com múltiplos seletores
+                let counterText = '0';
+                for (let sel of SELECTORS.COUNTERS) {
+                    const el = parentRow.querySelector(sel);
+                    if (el) {
+                        counterText = el.innerText;
+                        break;
+                    }
+                }
+                // Se o contador for 0 ou não existir, remove o olho
+                if (parseInt(counterText || '0') === 0) {
+                    eye.remove();
+                }
+            } else {
+                eye.remove(); // Remove órfãos
+            }
+        });
+
+        // 2. INJEÇÃO: Seleciona todas as linhas que tenham um ID
+        // Essa abordagem é mais robusta que classes específicas
+        const rows = document.querySelectorAll('[data-id]');
+
+        rows.forEach(row => {
+            const dialogId = row.getAttribute('data-id');
+            // IDs de chat do Bitrix geralmente são "chatXX" ou números
+            if (!dialogId) return;
+
+            // Busca contador usando nossa lista de seletores conhecidos
+            let counterWrap = null;
+            let hasMessages = false;
+
+            for (let sel of SELECTORS.COUNTERS) {
+                counterWrap = row.querySelector(sel);
+                if (counterWrap && parseInt(counterWrap.innerText || '0') > 0) {
+                    hasMessages = true;
+                    break;
+                }
+            }
+
+            // Só injeta se tiver mensagens e NÃO tiver olho
+            if (hasMessages && !row.querySelector('.bitrix-spy-eye')) {
+
+                const eyeBtn = document.createElement('div');
+                eyeBtn.className = 'bitrix-spy-eye';
+                eyeBtn.innerHTML = '👁️';
+                eyeBtn.title = 'Espiar (ID: ' + dialogId + ')';
+
+                // ESTILO FLUTUANTE (Restaurado do original funcional)
+                eyeBtn.style.cssText = `
+                    position: absolute;
+                    right: 45px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    z-index: 99999;
+                    cursor: pointer;
+                    font-size: 16px;
+                    background: white;
+                    border-radius: 50%;
+                    width: 22px;
+                    height: 22px;
+                    text-align: center;
+                    line-height: 22px;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+                `;
+                // NOTA: Removemos opacity: 0 e transition, agora ele é sempre visível
+
+                eyeBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const rect = eyeBtn.getBoundingClientRect();
+                    fetchSpyMessages(dialogId, rect.right + 15, rect.top);
+                });
+
+                // Garante que a linha tenha posição relativa para o olho ficar no lugar certo
+                if (getComputedStyle(row).position === 'static') {
+                    row.style.position = 'relative';
+                }
+
+                row.appendChild(eyeBtn);
+            }
+        });
+    }
+
     // --- 6. Notification Capture ---
 
     function processNode(node) {
@@ -489,67 +694,44 @@
             const imgEl = node.querySelector('.ui-notification-manager-browser-icon');
 
             if (nameEl && msgEl) {
-                const titleText = nameEl.innerText.trim(); // Group Name or Sender Name
-                let msgText = msgEl.innerText.trim();      // "Sender: [Imagem]" or just "[Imagem]"
+                const titleText = nameEl.innerText.trim();
+                let msgText = msgEl.innerText.trim();
                 const timestamp = new Date().toLocaleString();
-
                 let avatarSrc = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
                 if (imgEl && imgEl.src) avatarSrc = imgEl.src;
 
-                // --- LOGIC: Handle Groups & Direct Messages ---
                 const lowerMsg = msgText.toLowerCase();
                 const hasMediaTag = lowerMsg.includes('imagem') || lowerMsg.includes('adesivo');
 
                 if (hasMediaTag) {
-                    // 1. Determine who sent the message
-                    let senderName = titleText; // Default: The title is the sender (DM)
-
-                    // Check for Group Pattern: "Name: [Imagem]"
-                    // We look for a colon (:). If found, the part before it is likely the sender.
+                    let senderName = titleText;
                     if (msgText.includes(':')) {
                         const parts = msgText.split(':');
-                        // Heuristic: If the first part is reasonably short (a name), assume it's the sender
                         if (parts.length > 1 && parts[0].length < 50) {
                             senderName = parts[0].trim();
                         }
                     }
-
                     const safeName = senderName.toUpperCase();
-
-                    // 2. Check Buffer using the determined Sender Name
                     if (imageBuffer[safeName]) {
                         const realUrl = imageBuffer[safeName];
-
-                        // Clean up text: Remove "[Imagem]" and "Sender Name:" from the display text
-                        // Regex removes: "Name:", "[Imagem]", "[Adesivo]"
                         let caption = msgText
-                            .replace(new RegExp(`^${senderName}:`, 'i'), '') // Remove "Pedro:" prefix
-                            .replace(/\[?(imagem|adesivo)\]?/gi, '')         // Remove tags
+                            .replace(new RegExp(`^${senderName}:`, 'i'), '')
+                            .replace(/\[?(imagem|adesivo)\]?/gi, '')
                             .trim();
 
-                        msgText = `
-                            ${caption ? `<div style="margin-bottom: 5px; color: #333;">${caption}</div>` : ''}
-                            <a href="${realUrl}" target="_blank" title="Open Image">
-                                <img src="${realUrl}" style="max-width: 100%; max-height: 250px; border-radius: 6px; border: 1px solid #ccc; display:block; background-color: #f5f5f5;">
-                            </a>
-                        `;
+                        msgText = `${caption ? `<div style="margin-bottom: 5px; color: #333;">${caption}</div>` : ''} <a href="${realUrl}" target="_blank" title="Open Image"><img src="${realUrl}" style="max-width: 100%; max-height: 250px; border-radius: 6px; border: 1px solid #ccc; display:block; background-color: #f5f5f5;"></a>`;
                     }
                 }
-                // -----------------------------------------------------------
 
-                // Duplicate Check (Compare against the visible title, not necessarily the sender)
                 const last = csvHistory[csvHistory.length - 1];
                 const isDuplicate = last && last.name === titleText && last.message === msgText;
 
                 if (!isDuplicate) {
                     const entry = { name: titleText, message: msgText, img: avatarSrc, time: timestamp };
-
                     uiLog.push(entry);
                     if(uiLog.length > 200) uiLog.shift();
-
                     csvHistory.push(entry);
                     if(csvHistory.length > 1000) csvHistory.shift();
-
                     saveAllLogs();
                     if(modal.style.display !== 'none') updateModalContent();
                 }
@@ -572,11 +754,9 @@
         });
     });
 
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
+    observer.observe(document.body, { childList: true, subtree: true });
 
     setTimeout(tryInjectButton, 1000);
+    setInterval(injectSpyButtons, 2000);
 
 })();
