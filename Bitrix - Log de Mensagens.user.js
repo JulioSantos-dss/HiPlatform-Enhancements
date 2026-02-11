@@ -2,7 +2,7 @@
 // @name         Bitrix - Log de Mensagens
 // @namespace    http://tampermonkey.net/
 // @version      3.6
-// @description  Captura Notificações, UI editável, CSV mantém histórico. Ordem invertida e limite configurável.
+// @description  Captura Notificações, UI editável, CSV mantém histórico. Adicionado efeito hover robusto.
 // @author       Julio Santos feat. AI
 // @match        https://*.bitrix24.com*/*
 // @match        https://*.bitrix24.com.br*/*
@@ -14,6 +14,24 @@
 
 (function() {
     'use strict';
+
+    // --- ESTILO CSS (Hover e Animação) ---
+    // Adicionamos o CSS dinamicamente. Usamos [data-id] como gatilho do hover
+    // pois é o atributo mais estável que usamos para identificar a linha.
+    const style = document.createElement('style');
+    style.innerHTML = `
+        .bitrix-spy-eye {
+            opacity: 0; /* Invisível por padrão */
+            transition: opacity 0.2s ease-in-out;
+            pointer-events: none; /* Não bloqueia cliques quando invisível */
+        }
+        /* Quando passar o mouse na linha do chat (que possui o atributo data-id), mostra o olho */
+        [data-id]:hover .bitrix-spy-eye {
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
+    `;
+    document.head.appendChild(style);
 
     // --- CONFIGURAÇÃO DE SELETORES (COMPATIBILIDADE) ---
     // Usamos isso apenas para encontrar o CONTADOR, já que a linha buscamos por [data-id]
