@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hi - Gestão de Filas
 // @namespace    http://tampermonkey.net/
-// @version      1.6
+// @version      2.0
 // @description  Script desenvolvido com intenção de otimizar a gestão de filas
 // @author       Julio Santos feat. AI
 // @match        https://www5.directtalk.com.br/static/beta/admin/main.html*
@@ -13,663 +13,471 @@
 (function() {
     'use strict';
 
-    let buttonsCreated = false;
-    let sacChecked = false;
-    let helpChecked = false;
-    let selectAllButtonState = 'purple';
+    // Variável global para armazenar o nome do agente clicado
+    let clickedAgentName = '';
 
-    const buttonIds = {
-        sac: 'toggle-sac-button',
-        help: 'toggle-help-button'
-    };
+    // Intercepta o clique no botão que abre o modal para capturar o nome do agente
+    document.addEventListener('click', function(e) {
+        // Verifica se o elemento clicado (ou seu elemento pai) é o botão de abrir o modal
+        const btn = e.target.closest('button[ng-click^="openModal"]');
+        if (btn) {
+            // Procura a linha correspondente (TR) ou a célula (TD) onde o botão está
+            const container = btn.closest('td') || btn.closest('tr');
+            if (container) {
+                // Captura o texto do link com a classe cursor-pointer (que contém o nome do agente)
+                const nameLink = container.querySelector('a.cursor-pointer');
+                if (nameLink) {
+                    clickedAgentName = nameLink.textContent.trim();
+                }
+            }
+        }
+    }, true); // Usamos true (capture phase) para garantir que capturamos antes de o Angular abrir o modal
 
-    const exceptions = [
-        'cabonnet - chat messenger',
-        'fibra fast - chat whatsapp help',
-        'fibra fast - chat whatsapp sac',
-        'cmnet - chat whatsapp help',
-        'cmnet - chat whatsapp sac',
-        'cabonnet goodu adamantina - chat whatsapp help',
-        'cabonnet goodu adamantina - chat whatsapp sac',
-        'cabonnet goodu florida paulista - chat whatsapp help',
-        'cabonnet goodu florida paulista - chat whatsapp sac',
-        'cabonnet goodu inúbia paulista - chat whatsapp help',
-        'cabonnet goodu inúbia paulista - chat whatsapp sac',
-        'cabonnet goodu lucélia - chat whatsapp help',
-        'cabonnet goodu lucélia - chat whatsapp sac',
-        'cabonnet goodu osvaldo cruz - chat whatsapp help',
-        'cabonnet goodu osvaldo cruz - chat whatsapp sac',
-        'cabonnet premium - chat whatsapp help',
-        'cabonnet premium - chat whatsapp sac',
-        'cabonnet premium corp - chat whatsapp help',
-        'cabonnet premium corp - chat whatsapp sac'
+    // Lista de prioridade e ordem visual das categorias na tela
+    const categoriesOrder = [
+        'SAC', 'Help', 'Retenção', 'Suporte N3', 'Casos Críticos', 'Agendamento',
+        'Escritório', 'Cobrança', 'Churn Safra', 'Refidelização', 'Vendas',
+        'COPE Distribuição', 'COPE', 'Loja', 'Cadastro', 'Bot', 'Inativo', 'Outros'
     ];
 
-    const departments = [
-        'Cabonnet - Chat Help',
-        //'Cabonnet - Chat Messenger',
-        'Cabonnet - Chat SAC',
-        'Cabonnet Adamantina - Chat Whatsapp Help',
-        'Cabonnet Adamantina - Chat Whatsapp SAC',
-        'Cabonnet Assis - Chat Whatsapp Help',
-        'Cabonnet Assis - Chat Whatsapp SAC',
-        'Cabonnet Bastos - Chat Whatsapp Help',
-        'Cabonnet Bastos - Chat Whatsapp SAC',
-        'Cabonnet Caçapava - Chat Whatsapp Help',
-        'Cabonnet Caçapava - Chat Whatsapp SAC',
-        'Cabonnet GoodU - Chat Help',
-        'Cabonnet GoodU - Chat SAC',
-        'Cabonnet Lins - Chat Whatsapp Help',
-        'Cabonnet Lins - Chat Whatsapp SAC',
-        'Cabonnet Ourinhos - Chat Whatsapp Help',
-        'Cabonnet Ourinhos - Chat Whatsapp SAC',
-        'Cabonnet Penápolis - Chat Whatsapp Help',
-        'Cabonnet Penápolis - Chat Whatsapp SAC',
-        'Cabonnet Pindamonhangaba - Chat Whatsapp Help',
-        'Cabonnet Pindamonhangaba - Chat Whatsapp SAC',
-        'Cabonnet Prudente - Chat Whatsapp Help',
-        'Cabonnet Prudente - Chat Whatsapp SAC',
-        'Cabonnet Santa Cruz - Chat WhatsApp HELP',
-        'Cabonnet Santa Cruz - Chat WhatsApp SAC',
-        'Cabonnet Taubaté - Chat WhatsApp Help',
-        'Cabonnet Taubaté - Chat WhatsApp SAC',
-        'Cabonnet Tupã - Chat Whatsapp Help',
-        'Cabonnet Tupã - Chat Whatsapp SAC',
-        'Chat WhatsApp Falha API'
-    ]
+    // Dicionário de mapeamento das strings
+    const categoryKeywords = {
+        'SAC': [
+            'Cabonnet - Chat SAC', 'Cabonnet GoodU - Chat SAC', 'Cabonnet Adamantina - Chat Whatsapp SAC',
+            'Cabonnet Assis - Chat Whatsapp SAC', 'Cabonnet Bastos - Chat Whatsapp SAC', 'Cabonnet Caçapava - Chat Whatsapp SAC',
+            'Cabonnet Lins - Chat Whatsapp SAC', 'Cabonnet Ourinhos - Chat Whatsapp SAC', 'Cabonnet Penápolis - Chat Whatsapp SAC',
+            'Cabonnet Pindamonhangaba - Chat Whatsapp SAC', 'Cabonnet Prudente - Chat Whatsapp SAC', 'Cabonnet Santa Cruz - Chat WhatsApp SAC',
+            'Cabonnet Taubaté - Chat WhatsApp SAC', 'Cabonnet - Chat Messenger', 'Chat WhatsApp Falha API', 'Cabonnet Tupã - Chat Whatsapp SAC'
+        ],
+        'Help': [
+            'Cabonnet - Chat Help', 'Cabonnet GoodU - Chat Help', 'Cabonnet Adamantina - Chat Whatsapp Help',
+            'Cabonnet Assis - Chat Whatsapp Help', 'Cabonnet Bastos - Chat Whatsapp Help', 'Cabonnet Caçapava - Chat Whatsapp Help',
+            'Cabonnet Lins - Chat Whatsapp Help', 'Cabonnet Ourinhos - Chat Whatsapp Help', 'Cabonnet Penápolis - Chat Whatsapp Help',
+            'Cabonnet Pindamonhangaba - Chat Whatsapp Help', 'Cabonnet Prudente - Chat Whatsapp Help', 'Cabonnet Santa Cruz - Chat WhatsApp HELP',
+            'Cabonnet Taubaté - Chat WhatsApp Help', 'Cabonnet Tupã - Chat Whatsapp Help'
+        ],
+        'Vendas': [
+            'Cabonnet Taubaté - Chat WhatsApp Vendas', 'Cabonnet Assis - Chat Whatsapp Vendas', 'Cabonnet Adamantina - Chat Whatsapp Vendas',
+            'Cabonnet Pindamonhangaba - Chat Whatsapp Vendas', 'Cabonnet Tupã - Chat Whatsapp Vendas', 'Cabonnet Prudente - Chat Whatsapp Vendas',
+            'Cabonnet - Chat Vendas', 'Cabonnet Penápolis - Chat Whatsapp Vendas', 'Cabonnet Caçapava - Chat Whatsapp Vendas',
+            'Cabonnet Lins - Chat Whatsapp Vendas', 'Cabonnet Santa Cruz - Chat WhatsApp Vendas', 'Cabonnet Ourinhos - Chat Whatsapp Vendas',
+            'Cabonnet Bastos - Chat Whatsapp Vendas'
+        ],
+        'Inativo': [
+            'GoodU Adamantina', 'GoodU Florida Paulista', 'GoodU Inúbia Paulista', 'GoodU Lucélia', 'GoodU Osvaldo Cruz',
+            'Cabonnet Premium', 'Tera', 'Cmnet', 'CMNet', 'Lins Fibra', 'Fibra Fast', 'Chat SAC', 'Chat Help',
+            'Cabonnet Vale - Chat Whatsapp Churn', 'Chat Vendas',
+            'Tera - Chat WhatsApp Churn Safra', 'Cmnet - Chat WhatsApp Churn Safra',
+            'Tera - Chat WhatsApp Cobrança', 'Cmnet - Chat WhatsApp Cobrança'
+        ],
+        'Cadastro': ['Cadastro'],
+        'Casos Críticos': ['Casos Críticos'],
+        'Refidelização': ['Refidelização'],
+        'Suporte N3': ['Suporte N3'],
+        'Agendamento': ['Agendamento'],
+        'Churn Safra': ['Churn Safra'],
+        'Cobrança': ['Cobrança', 'Financeiro - Chat Whatsapp'],
+        'Escritório': ['Escritório'],
+        'Loja': ['Loja'],
+        'Retenção': ['Retenção', 'Retencao'],
+        'COPE Distribuição': ['COPE Distribuição'],
+        'COPE': ['COPE'],
+        'Bot': ['Bot']
+    };
 
-    function isModalVisible() {
-        const modal = document.getElementById('edicaoAlert');
-        return modal && modal.style.display === 'block';
-    }
+    /**
+     * Define a qual categoria o departamento pertence baseado no nome
+     */
+    function getCategory(text) {
+        text = text.toLowerCase();
 
-    function createDepartmentDropdown() {
-        const dropdown = document.createElement('div');
-        dropdown.id = 'department-dropdown';
-        dropdown.style.position = 'fixed';
-        dropdown.style.top = '96px';
-        dropdown.style.left = '10px';
-        dropdown.style.zIndex = '10000';
-        dropdown.style.backgroundColor = '#fff';
-        dropdown.style.border = '1px solid #ddd';
-        dropdown.style.padding = '10px';
-        dropdown.style.maxHeight = '700px';
-        dropdown.style.display = 'none';
-        dropdown.style.display = 'flex';
-        dropdown.style.flexDirection = 'column';
-
-        const checkboxContainer = document.createElement('div');
-        checkboxContainer.style.overflowY = 'auto';
-        checkboxContainer.style.maxHeight = '400px';
-        checkboxContainer.style.marginBottom = '10px';
-
-        departments.forEach((dept, index) => {
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.id = `dept-${index}`;
-            checkbox.value = dept;
-            checkbox.style.marginRight = '5px';
-
-            const label = document.createElement('label');
-            label.htmlFor = `dept-${index}`;
-            label.textContent = dept;
-
-            checkboxContainer.appendChild(checkbox);
-            checkboxContainer.appendChild(label);
-            checkboxContainer.appendChild(document.createElement('br'));
-        });
-
-        dropdown.appendChild(checkboxContainer);
-
-        const buttonContainer = document.createElement('div');
-        buttonContainer.style.display = 'flex';
-        buttonContainer.style.flexDirection = 'column';
-        buttonContainer.style.marginTop = 'auto';
-
-        const topRowContainer = document.createElement('div');
-        topRowContainer.style.display = 'flex';
-        topRowContainer.style.justifyContent = 'space-between';
-        topRowContainer.style.marginBottom = '10px';
-
-        const selectAllButton = document.createElement('button');
-        selectAllButton.textContent = 'Selecionar Todas';
-        selectAllButton.onclick = selectAllDepartments;
-        selectAllButton.style.transition = 'transform 0.1s';
-
-        const deselectAllButton = document.createElement('button');
-        deselectAllButton.textContent = 'Deselecionar Todas';
-        deselectAllButton.onclick = deselectAllDepartments;
-        deselectAllButton.style.transition = 'transform 0.1s';
-
-        const invertSelectionButton = document.createElement('button');
-        invertSelectionButton.textContent = 'Inverter Seleção';
-        invertSelectionButton.onclick = invertDepartmentSelection;
-        invertSelectionButton.style.transition = 'transform 0.1s';
-
-        topRowContainer.appendChild(selectAllButton);
-        topRowContainer.appendChild(deselectAllButton);
-        topRowContainer.appendChild(invertSelectionButton);
-
-        const saveButton = document.createElement('button');
-        saveButton.textContent = 'Aplicar';
-        saveButton.onclick = applyDepartmentSelection;
-        saveButton.style.backgroundColor = '#007bff';
-        saveButton.style.border = 'none';
-        saveButton.style.color = '#fff';
-        saveButton.style.width = '100%';
-        saveButton.style.transition = 'transform 0.1s';
-        saveButton.style.borderRadius = '5px';
-
-        function addButtonEffect(button) {
-            button.style.transition = 'transform 0.1s';
-            button.addEventListener('mousedown', () => {
-                button.style.transform = 'scale(0.95)';
-            });
-            button.addEventListener('mouseup', () => {
-                button.style.transform = 'scale(1)';
-            });
-            button.addEventListener('mouseleave', () => {
-                button.style.transform = 'scale(1)';
-            });
-        }
-
-        addButtonEffect(selectAllButton);
-        addButtonEffect(deselectAllButton);
-        addButtonEffect(invertSelectionButton);
-        addButtonEffect(saveButton);
-
-        buttonContainer.appendChild(topRowContainer);
-        buttonContainer.appendChild(saveButton);
-
-        dropdown.appendChild(buttonContainer);
-
-        document.body.appendChild(dropdown);
-    }
-
-
-
-function toggleDepartmentDropdown() {
-    let dropdown = document.getElementById('department-dropdown');
-    if (!dropdown) {
-        createDepartmentDropdown();
-        dropdown = document.getElementById('department-dropdown');
-        dropdown.style.display = 'block';
-    } else {
-        dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
-    }
-}
-
-function addFilterInput() {
-    const modalBody = document.querySelector('#edicaoAlert .modal-body');
-    if (!modalBody || document.getElementById('hideDisabled')) return;
-
-    const filterContainer = document.createElement('div');
-    filterContainer.style.display = 'flex';
-    filterContainer.style.flexDirection = 'column'; // Changed to column layout
-    filterContainer.style.margin = '10px 0';
-
-    const filterInput = document.createElement('input');
-    filterInput.type = 'text';
-    filterInput.placeholder = 'Procurar...';
-    filterInput.style.width = '100%'; // Full width
-    filterInput.style.padding = '5px';
-    filterInput.style.marginBottom = '5px'; // Add space between input and checkbox
-
-    const checkboxContainer = document.createElement('div');
-    checkboxContainer.style.display = 'flex';
-    checkboxContainer.style.alignItems = 'center';
-    //checkboxContainer.style.justifyContent = 'center'; // Centers horizontally
-
-    const hideDisabledCheckbox = document.createElement('input');
-    hideDisabledCheckbox.type = 'checkbox';
-    hideDisabledCheckbox.id = 'hideDisabled';
-    hideDisabledCheckbox.checked = true;
-    hideDisabledCheckbox.style.margin = '0'; // Reset margin
-    hideDisabledCheckbox.style.marginRight = '8px'; // Adds space between checkbox and label
-    hideDisabledCheckbox.style.marginLeft = '4px';
-
-    const checkboxLabel = document.createElement('label');
-    checkboxLabel.htmlFor = 'hideDisabled';
-    checkboxLabel.textContent = 'Ocultar Bloqueados';
-    checkboxLabel.style.marginLeft = '5px';
-    checkboxLabel.style.userSelect = 'none';
-    checkboxLabel.style.margin = '0'; // Reset margin
-    checkboxLabel.style.display = 'flex';
-    checkboxLabel.style.alignItems = 'center';
-
-
-    checkboxContainer.appendChild(hideDisabledCheckbox);
-    checkboxContainer.appendChild(checkboxLabel);
-    filterContainer.appendChild(filterInput);
-    filterContainer.appendChild(checkboxContainer);
-    modalBody.insertBefore(filterContainer, modalBody.firstChild);
-
-    // Add event listeners
-    filterInput.addEventListener('input', () => filterDepartments(filterInput.value));
-    hideDisabledCheckbox.addEventListener('change', () => filterDepartments(filterInput.value));
-
-    // Initial filter
-    setTimeout(() => filterDepartments(filterInput.value), 100);
-
-    const departmentObserver = new MutationObserver((mutations, observer) => {
-        const departments = document.querySelectorAll('#edicaoAlert .modal-body .checkbox');
-        if (departments.length > 0) {
-            filterDepartments.call(filterInput);
-            observer.disconnect();
-        }
-    });
-
-    departmentObserver.observe(modalBody, {
-        childList: true,
-        subtree: true
-    });
-}
-
-function filterDepartments(filterValue = '') {
-    const hideDisabled = document.getElementById('hideDisabled')?.checked;
-    const departments = document.querySelectorAll('#edicaoAlert .modal-body .checkbox');
-
-    departments.forEach(dept => {
-        const deptName = dept.textContent.toLowerCase();
-        const isDisabled = dept.classList.contains('checkbox-disabled');
-        const matchesFilter = deptName.includes(filterValue.toLowerCase());
-
-        if (hideDisabled && isDisabled) {
-            dept.style.display = 'none';
-        } else {
-            dept.style.display = matchesFilter ? '' : 'none';
-        }
-    });
-}
-
-function adjustWindowPosition() {
-    const modal = document.querySelector('#edicaoAlert');
-    if (modal) {
-        const currentTop = parseInt(window.getComputedStyle(modal).top);
-        modal.style.top = (currentTop - 25) + 'px';
-    }
-}
-
-function selectAllDepartments() {
-    const checkboxes = document.querySelectorAll('#department-dropdown input[type="checkbox"]');
-    checkboxes.forEach(checkbox => {
-        checkbox.checked = true;
-    });
-}
-
-function deselectAllDepartments() {
-    const checkboxes = document.querySelectorAll('#department-dropdown input[type="checkbox"]');
-    checkboxes.forEach(checkbox => {
-        checkbox.checked = false;
-    });
-}
-
-function invertDepartmentSelection() {
-    const checkboxes = document.querySelectorAll('#department-dropdown input[type="checkbox"]');
-    checkboxes.forEach(checkbox => {
-        checkbox.checked = !checkbox.checked;
-    });
-}
-
-function applyDepartmentSelection() {
-    const selectedDepartments = Array.from(document.querySelectorAll('#department-dropdown input:checked'))
-        .map(checkbox => checkbox.value);
-
-    const labels = document.querySelectorAll('label');
-
-    labels.forEach(label => {
-        const checkbox = label.querySelector('input[type="checkbox"]');
-        if (checkbox) {
-            const labelText = label.textContent.trim();
-            if (labelText !== "Cabonnet - Chat Messenger") {
-                checkbox.checked = !selectedDepartments.some(dept => labelText.includes(dept));
-                simulateCheckboxInteraction(checkbox);
-            }
-        }
-    });
-
-    //document.getElementById('department-dropdown').style.display = 'none';
-}
-
-    function isException(labelText) {
-        const normalizedLabelText = labelText.toLowerCase();
-        return exceptions.some(exception => normalizedLabelText.includes(exception));
-    }
-
-    function simulateCheckboxInteraction(checkbox) {
-        const event = new Event('change', { bubbles: true });
-        checkbox.dispatchEvent(event);
-
-        checkbox.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-        checkbox.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-        checkbox.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-
-        // Get the department div
-        const departmentDiv = checkbox.closest('.ng-scope');
-        if (departmentDiv) {
-            // Check if current state matches original state
-            const isOriginalState = checkbox.checked === checkbox.defaultChecked;
-
-            // Set or remove highlight based on state
-            departmentDiv.style.backgroundColor = isOriginalState ? '' : '#FFB6C1';
-        }
-    }
-
-
-    function toggleALLCheckboxes() {
-        const labels = document.querySelectorAll('label');
-
-        labels.forEach(label => {
-            const checkbox = label.querySelector('input[type="checkbox"]');
-            if (checkbox) {
-                const labelText = label.textContent.trim().toLowerCase();
-
-                if ((labelText.includes('chat whatsapp sac') || labelText.includes('cabonnet goodu - chat sac') || labelText.includes('cabonnet - chat sac') || labelText.includes('chat whatsapp falha api')) && !isException(labelText)) {
-                    checkbox.checked = !sacChecked;
-                    simulateCheckboxInteraction(checkbox);
-                }
-
-                if ((labelText.includes('chat whatsapp help') || labelText.includes('cabonnet - chat help') || (labelText.includes('cabonnet goodu - chat help'))) && !isException(labelText)) {
-                    checkbox.checked = !helpChecked;
-                    simulateCheckboxInteraction(checkbox);
+        // 0. Checa correspondência EXATA primeiro (Prioridade Absoluta).
+        for (const cat of categoriesOrder) {
+            const keywords = categoryKeywords[cat] || [];
+            for (const kw of keywords) {
+                if (text === kw.toLowerCase()) {
+                    return cat;
                 }
             }
-        });
-
-        helpChecked = !helpChecked;
-        sacChecked = !sacChecked;
-        console.log(sacChecked ? 'Todas selecionadas' : 'Todas desmarcadas');
-    }
-
-    function toggleSACCheckboxes() {
-        const labels = document.querySelectorAll('label');
-
-        labels.forEach(label => {
-            const checkbox = label.querySelector('input[type="checkbox"]');
-            if (checkbox) {
-                const labelText = label.textContent.trim().toLowerCase();
-
-                if ((labelText.includes('chat whatsapp sac') || labelText.includes('cabonnet goodu - chat sac')) && !isException(labelText)) {
-                    checkbox.checked = !sacChecked;
-                    simulateCheckboxInteraction(checkbox);
-                }
-            }
-        });
-
-        sacChecked = !sacChecked;
-        console.log(sacChecked ? 'SAC selecionadas' : 'SAC desmarcadas');
-    }
-
-    function toggleHelpCheckboxes() {
-        const labels = document.querySelectorAll('label');
-
-        labels.forEach(label => {
-            const checkbox = label.querySelector('input[type="checkbox"]');
-            if (checkbox) {
-                const labelText = label.textContent.trim().toLowerCase();
-
-                if ((labelText.includes('chat whatsapp help') || labelText.includes('cabonnet goodu - chat help')) && !isException(labelText)) {
-                    checkbox.checked = !helpChecked;
-                    simulateCheckboxInteraction(checkbox);
-                }
-            }
-        });
-
-        helpChecked = !helpChecked;
-        console.log(helpChecked ? 'Help selecionadas' : 'Help desmarcadas');
-    }
-
-    function createButton(id, text, onClickFunction, top, left, color) {
-        const button = document.createElement('button');
-        button.id = id;
-        button.textContent = text;
-        button.style.position = 'fixed';
-        button.style.top = top;
-        button.style.left = left;
-        button.style.zIndex = '9999';
-        button.style.backgroundColor = color;
-        button.style.color = '#fff';
-        button.style.border = 'none';
-        button.style.padding = '10px 20px';
-        button.style.fontSize = '14px';
-        button.style.cursor = 'pointer';
-        button.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
-        button.style.pointerEvents = 'auto';
-        button.style.width = '160px'; // Adjust this value as needed
-        button.style.textAlign = 'center';
-        button.style.whiteSpace = 'nowrap';
-        button.style.overflow = 'hidden';
-        button.style.textOverflow = 'ellipsis';
-        button.style.transition = 'transform 0.1s';
-        button.style.borderRadius = '5px';
-        button.addEventListener('mousedown', () => {
-            button.style.transform = 'scale(0.95)';
-        });
-        button.addEventListener('mouseup', () => {
-            button.style.transform = 'scale(1)';
-        });
-        button.addEventListener('mouseleave', () => {
-            button.style.transform = 'scale(1)';
-        });
-
-        button.onclick = onClickFunction;
-        document.body.appendChild(button);
-    }
-
-    function addCheckboxListeners() {
-        const checkboxes = document.querySelectorAll('#edicaoAlert .modal-body .checkbox input[type="checkbox"]');
-        checkboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', function() {
-                const departmentDiv = this.closest('.ng-scope');
-                if (departmentDiv) {
-                    const isOriginalState = this.checked === this.defaultChecked;
-                    departmentDiv.style.backgroundColor = isOriginalState ? '' : '#fff3cd';
-                }
-            });
-        });
-    }
-
-
-    function createButtons() {
-
-        if (!isModalVisible()) return;
-
-        if (!document.getElementById(buttonIds.all)) {
-            createButton(
-                buttonIds.all,
-                'Selecionar Todas',
-                function() {
-                    toggleALLCheckboxes();
-                    if (selectAllButtonState === 'purple') {
-                        this.style.backgroundColor = '#dc3545'; // Red
-                        selectAllButtonState = 'red';
-                    } else {
-                        this.style.backgroundColor = '#5814a6'; // Purple
-                        selectAllButtonState = 'purple';
-                    }
-                },
-                '10px', '10px', '#5814a6'
-            );
         }
 
-        if (!document.getElementById(buttonIds.sac)) {
-            createButton(
-                buttonIds.sac,
-                'Selecionar SAC',
-                function() {
-                    toggleSACCheckboxes();
-                    this.textContent = sacChecked ? 'Deselecionar SAC' : 'Selecionar SAC';
-                },
-                '10px', '172px', '#007bff'
-            );
-        }
-
-        if (!document.getElementById(buttonIds.help)) {
-            createButton(
-                buttonIds.help,
-                'Selecionar Help',
-                function() {
-                    toggleHelpCheckboxes();
-                    this.textContent = helpChecked ? 'Deselecionar Help' : 'Selecionar Help';
-                },
-                '10px', '334px', '#28a745'
-            );
-        }
-
-        if (!document.getElementById('department-selector')) {
-            const dropdownButton = document.createElement('button');
-            dropdownButton.id = 'department-selector';
-            dropdownButton.textContent = 'Especificas';
-            dropdownButton.style.position = 'fixed';
-            dropdownButton.style.top = '55px';
-            dropdownButton.style.left = '10px';
-            dropdownButton.style.zIndex = '9999';
-            dropdownButton.style.backgroundColor = '#ffc107';
-            dropdownButton.style.color = '#000';
-            dropdownButton.style.border = 'none';
-            dropdownButton.style.padding = '10px 20px';
-            dropdownButton.style.fontSize = '15px';
-            dropdownButton.style.cursor = 'pointer';
-            dropdownButton.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
-            dropdownButton.style.pointerEvents = 'auto';
-            dropdownButton.style.width = '160px'; // Adjust this value as needed
-            dropdownButton.style.textAlign = 'center';
-            dropdownButton.style.whiteSpace = 'nowrap';
-            dropdownButton.style.overflow = 'hidden';
-            dropdownButton.style.textOverflow = 'ellipsis';
-            dropdownButton.style.transition = 'transform 0.1s';
-            dropdownButton.addEventListener('mousedown', () => {
-                dropdownButton.style.transform = 'scale(0.95)';
-            });
-            dropdownButton.addEventListener('mouseup', () => {
-                dropdownButton.style.transform = 'scale(1)';
-            });
-            dropdownButton.addEventListener('mouseleave', () => {
-                dropdownButton.style.transform = 'scale(1)';
-            });
-
-            dropdownButton.onclick = toggleDepartmentDropdown;
-            document.body.appendChild(dropdownButton);
-        }
-    }
-
-    // Cria os botões inicialmente
-    createButtons();
-
-    // Observador de Mutação para verificar mudanças no DOM
-    const observer = new MutationObserver(mutations => {
-        mutations.forEach(mutation => {
-            if (mutation.addedNodes.length) {
-                // Apenas recria os botões se necessário
-                createButtons();
+        // 1. Checa a categoria Inativo usando correspondência parcial (Prioridade Máxima Parcial).
+        const inativoKeywords = categoryKeywords['Inativo'] || [];
+        for (const kw of inativoKeywords) {
+            if (text.includes(kw.toLowerCase())) {
+                return 'Inativo';
             }
-        });
-    });
+        }
 
-    // Configura o observador para observar alterações no corpo do documento
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
+        // 2. Itera na ordem normal para correspondências parciais do restante das categorias
+        for (const cat of categoriesOrder) {
+            if (cat === 'Inativo') continue; // Pula Inativo pois já checamos
 
-    const modalObserver = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-            if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
-                if (isModalVisible()) {
-                    createButtons();
-                    toggleDepartmentDropdown();
-                    //addFilterInput()
-                } else {
-                    // Remove buttons when modal is hidden
-                    removeButtons();
+            const keywords = categoryKeywords[cat] || [];
+            for (const kw of keywords) {
+                if (text.includes(kw.toLowerCase())) {
+                    return cat;
                 }
             }
+        }
+        return 'Outros';
+    }
+
+    /**
+     * Executa a manipulação DOM para reordenar de forma visual e criar os cabeçalhos
+     */
+    function reorganizeDOM(container, checkboxes) {
+        // Altera o modal para ocupar mais espaço na tela e mostrar tudo de uma vez
+        const modalDialog = container.closest('.modal-dialog');
+        if (modalDialog) {
+            modalDialog.style.width = '95vw';
+            modalDialog.style.maxWidth = '1600px';
+        }
+
+        // Marca de forma definitiva esse container
+        container.dataset.gridContainer = "true";
+
+        // Transforma o container original em um Grid flexível e ajusta para ocupar espaço no flexbox
+        container.style.flexGrow = '1';     // Expande para preencher todo o meio da tela, empurrando o rodapé pro fim
+        container.style.maxHeight = 'none'; // Flexbox controla agora
+        container.style.overflowY = 'auto'; // Mantém rolagem se a grid transbordar internamente
+        container.style.display = 'grid';
+        container.style.gridTemplateColumns = 'repeat(auto-fit, minmax(320px, 1fr))';
+        container.style.gap = '15px';
+        container.style.alignItems = 'start'; // Evita que cards estiquem verticalmente
+        container.style.padding = '10px';
+
+        const groups = {};
+        categoriesOrder.forEach(cat => groups[cat] = []);
+
+        checkboxes.forEach(cb => {
+            const labelText = cb.textContent.trim();
+            const cat = getCategory(labelText);
+            groups[cat].push(cb);
         });
-    });
-    const modal = document.getElementById('edicaoAlert');
-    if (modal) {
-        modalObserver.observe(modal, { attributes: true, attributeFilter: ['style'] });
-    }
 
-    function removeButtons() {
-        const buttons = [
-            document.getElementById(buttonIds.all),
-            document.getElementById(buttonIds.sac),
-            document.getElementById(buttonIds.help),
-            document.getElementById('department-selector')
-            //document.getElementById('department-dropdown')
-        ];
-        buttons.forEach(button => button && button.remove());
+        const fragment = document.createDocumentFragment();
 
-        document.getElementById('department-dropdown').style.display = 'none';
-    }
+        categoriesOrder.forEach(cat => {
+            if (groups[cat].length > 0) {
+                // Cria um container simulando um "Card" para cada categoria
+                const groupContainer = document.createElement('div');
+                groupContainer.className = 'category-group';
+                groupContainer.style.cssText = `
+                    background: #fdfdfd;
+                    border: 1px solid #ddd;
+                    border-radius: 6px;
+                    padding: 10px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                `;
 
+                // Cabeçalho
+                const header = document.createElement('div');
+                header.className = 'category-group-header';
+                header.style.cssText = `
+                    background: #e9ecef;
+                    padding: 8px 10px;
+                    margin-bottom: 10px;
+                    border-radius: 4px;
+                    color: #333;
+                    border-left: 4px solid #007bff;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                `;
 
+                // Título
+                const titleSpan = document.createElement('span');
+                titleSpan.style.cssText = 'cursor: pointer; font-weight: bold; text-transform: uppercase; flex-grow: 1; user-select: none; font-size: 14px;';
+                titleSpan.innerHTML = `▼ ${cat}`;
 
-function checkModalAndManageButtons() {
-    const modal = document.getElementById('edicaoAlert');
-    if (modal && modal.style.display === 'block' && !buttonsCreated) {
-        createButtons();
-        toggleDepartmentDropdown();
-        addFilterInput();
-        addCheckboxListeners();
+                // Botão de alternar
+                const toggleAllBtn = document.createElement('button');
+                toggleAllBtn.textContent = 'Marcar Todos';
+                toggleAllBtn.type = 'button';
+                toggleAllBtn.style.cssText = `
+                    background: #007bff;
+                    color: white;
+                    border: none;
+                    border-radius: 3px;
+                    padding: 4px 8px;
+                    font-size: 11px;
+                    cursor: pointer;
+                    margin-left: 10px;
+                    transition: background 0.2s;
+                `;
+                toggleAllBtn.onmouseover = () => toggleAllBtn.style.background = '#0056b3';
+                toggleAllBtn.onmouseout = () => toggleAllBtn.style.background = '#007bff';
 
-        // Add department loading observer
-        const departmentObserver = new MutationObserver((mutations, observer) => {
-            const departments = document.querySelectorAll('#edicaoAlert .modal-body .checkbox');
-            if (departments.length > 0) {
-                filterDepartments.call(document.querySelector('#edicaoAlert .modal-body input[type="text"]'));
+                header.appendChild(titleSpan);
+                header.appendChild(toggleAllBtn);
 
-                // Add manual checkbox listeners
-                departments.forEach(dept => {
-                    const checkbox = dept.querySelector('input[type="checkbox"]');
-                    if (checkbox && !checkbox.hasListener) {
-                        checkbox.hasListener = true;
-                        checkbox.addEventListener('change', function() {
-                            const departmentDiv = this.closest('.ng-scope');
-                            if (departmentDiv) {
-                                const isOriginalState = this.checked === this.defaultChecked;
-                                departmentDiv.style.backgroundColor = isOriginalState ? '' : '#FFB6C1';
-                            }
-                        });
+                // Container interno de checkboxes
+                const contentWrapper = document.createElement('div');
+                contentWrapper.className = 'category-content';
+
+                // Função para atualizar os contadores e textos dinamicamente
+                const updateState = () => {
+                    const inputs = contentWrapper.querySelectorAll('input[type="checkbox"]');
+                    const total = inputs.length;
+                    const checkedCount = Array.from(inputs).filter(i => i.checked).length;
+                    const isHidden = contentWrapper.style.display === 'none';
+
+                    // Atualiza o título com o contador
+                    titleSpan.innerHTML = `${isHidden ? '▼' : '▶'} ${cat} <span style="font-size: 11px; color: #666; margin-left: 5px;">(${checkedCount}/${total})</span>`;
+
+                    // Altera o texto do botão inteligente
+                    const anyUnchecked = Array.from(inputs).some(input => !input.checked && !input.disabled);
+                    toggleAllBtn.textContent = anyUnchecked ? 'Marcar Todos' : 'Desmarcar Todos';
+                };
+
+                groups[cat].forEach(cb => {
+                    // Remove classes do bootstrap que forçavam a quebra indesejada no grid
+                    cb.classList.remove('col-sm-12');
+                    cb.style.paddingLeft = '5px';
+                    cb.style.marginBottom = '5px';
+                    contentWrapper.appendChild(cb);
+
+                    // Atualiza o contador quando a checkbox for clicada individualmente
+                    const input = cb.querySelector('input[type="checkbox"]');
+                    if (input) {
+                        input.addEventListener('change', () => setTimeout(updateState, 10));
                     }
                 });
 
-                observer.disconnect();
+                // Lógica de Recolher/Expandir
+                titleSpan.addEventListener('click', () => {
+                    const isHidden = contentWrapper.style.display === 'none';
+                    contentWrapper.style.display = isHidden ? 'block' : 'none';
+                    updateState();
+                });
+
+                // Lógica de Alternar Todos
+                toggleAllBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const inputs = contentWrapper.querySelectorAll('input[type="checkbox"]');
+
+                    const anyUnchecked = Array.from(inputs).some(input => !input.checked && !input.disabled);
+
+                    inputs.forEach(input => {
+                        if (!input.disabled) {
+                            if (anyUnchecked && !input.checked) {
+                                input.click();
+                            } else if (!anyUnchecked && input.checked) {
+                                input.click();
+                            }
+                        }
+                    });
+                    updateState();
+                });
+
+                // Dispara o estado inicial
+                updateState();
+
+                groupContainer.appendChild(header);
+                groupContainer.appendChild(contentWrapper);
+                fragment.appendChild(groupContainer);
             }
         });
 
-
-        departmentObserver.observe(modal, {
-            childList: true,
-            subtree: true
-        });
-
-        buttonsCreated = true;
-    } else if ((!modal || modal.style.display === 'none') && buttonsCreated) {
-        removeButtons();
-        buttonsCreated = false;
+        container.appendChild(fragment);
     }
-}
 
-    const observert = new MutationObserver((mutations) => {
-        for (let mutation of mutations) {
-            if (mutation.type === 'childList') {
-                const addedNodes = mutation.addedNodes;
-                for (let node of addedNodes) {
-                    if (node.id === 'edicaoAlert') {
-                        //addFilterInput();
-                        filterDepartments.call({value: ''}); // Initially hide disabled checkboxes
-                        adjustWindowPosition();
-                        observert.disconnect();
-                        return;
+    /**
+     * Observador de mutação
+     */
+    const observer = new MutationObserver(() => {
+        const legends = document.querySelectorAll('legend');
+        for (let legend of legends) {
+            // Usamos startsWith pois o texto será alterado e não queremos perder a referência
+            if (legend.textContent.trim().startsWith('Troca de departamento')) {
+                const form = legend.closest('form');
+                if (form) {
+
+                    // --- Transforma o formulário em Flexbox para garantir Topo e Rodapé fixos na tela ---
+                    if (!form.dataset.flexEnhanced) {
+                        form.style.display = 'flex';
+                        form.style.flexDirection = 'column';
+                        form.style.height = '80vh'; // Define uma altura global ocupando 80% da tela
+                        form.dataset.flexEnhanced = "true";
+
+                        // Oculta a barra de rolagem externa da página/modal para focar apenas na lista interna
+                        const modalBody = form.closest('.modal-body');
+                        if (modalBody) {
+                            modalBody.style.overflow = 'hidden';
+                            modalBody.style.paddingBottom = '0'; // Dá mais espaço e cola o rodapé no fim
+                        }
+                    }
+
+                    // Altera o título sempre que o nome atual não corresponder ao nome recém-clicado
+                    const expectedTitle = `Troca de departamento - ${clickedAgentName}`;
+                    if (clickedAgentName && legend.textContent.trim() !== expectedTitle) {
+                        legend.textContent = expectedTitle;
+                    }
+
+                    // --- ADIÇÃO DA BARRA DE BUSCA E BOTÃO DE FECHAR (X) ---
+                    if (!legend.dataset.enhanced) {
+                        const headerContainer = legend.parentElement;
+
+                        // Transforma o container original da tag legend num item Fixo no topo do Flexbox
+                        headerContainer.style.display = 'flex';
+                        headerContainer.style.justifyContent = 'space-between';
+                        headerContainer.style.alignItems = 'center';
+                        headerContainer.style.borderBottom = '1px solid #e5e5e5';
+                        headerContainer.style.padding = '10px 0';
+                        headerContainer.style.flexShrink = '0'; // Impede o cabeçalho de encolher
+                        headerContainer.style.backgroundColor = '#fff';
+
+                        // Ajustes no Legend para caber na mesma linha
+                        legend.style.borderBottom = 'none';
+                        legend.style.margin = '0';
+                        legend.style.width = 'auto';
+
+                        // Container lado-a-lado para o input e botão
+                        const controlsDiv = document.createElement('div');
+                        controlsDiv.style.display = 'flex';
+                        controlsDiv.style.alignItems = 'center';
+                        controlsDiv.style.gap = '15px';
+
+                        // Botão Global de Recolher/Expandir Tudo
+                        const globalToggleBtn = document.createElement('button');
+                        globalToggleBtn.type = 'button';
+                        globalToggleBtn.textContent = 'Recolher Tudo';
+                        globalToggleBtn.style.cssText = `
+                            background: #6c757d;
+                            color: white;
+                            border: none;
+                            border-radius: 3px;
+                            padding: 6px 12px;
+                            font-size: 12px;
+                            cursor: pointer;
+                            transition: background 0.2s;
+                        `;
+                        globalToggleBtn.onmouseover = () => globalToggleBtn.style.background = '#5a6268';
+                        globalToggleBtn.onmouseout = () => globalToggleBtn.style.background = '#6c757d';
+
+                        globalToggleBtn.onclick = () => {
+                            const isCollapsing = globalToggleBtn.textContent === 'Recolher Tudo';
+                            globalToggleBtn.textContent = isCollapsing ? 'Expandir Tudo' : 'Recolher Tudo';
+
+                            const groups = form.querySelectorAll('.category-group');
+                            groups.forEach(group => {
+                                const titleSpan = group.querySelector('.category-group-header span');
+                                const contentWrapper = group.querySelector('.category-content');
+                                if (titleSpan && contentWrapper) {
+                                    const isHidden = contentWrapper.style.display === 'none';
+                                    if ((isCollapsing && !isHidden) || (!isCollapsing && isHidden)) {
+                                        titleSpan.click(); // Alterna visualmente usando a lógica já existente
+                                    }
+                                }
+                            });
+                        };
+
+                        // Input de Busca
+                        const searchInput = document.createElement('input');
+                        searchInput.type = 'text';
+                        searchInput.id = 'cabonnet-dept-search';
+                        searchInput.placeholder = 'Buscar departamento...';
+                        searchInput.className = 'form-control'; // Classe nativa do painel para manter a estética
+                        searchInput.style.width = '250px';
+                        searchInput.style.height = '34px';
+
+                        // Botão de Fechar
+                        const closeBtn = document.createElement('button');
+                        closeBtn.type = 'button';
+                        closeBtn.className = 'close';
+                        closeBtn.innerHTML = '&times;';
+                        closeBtn.style.fontSize = '28px';
+                        closeBtn.style.marginTop = '-5px';
+                        closeBtn.title = 'Fechar modal';
+                        closeBtn.onclick = () => {
+                            // Clica programaticamente no botão real de Cancelar do Angular para fechar em segurança
+                            const cancelBtn = document.getElementById('dt-modal-confirm-cancel');
+                            if (cancelBtn) cancelBtn.click();
+                        };
+
+                        // Lógica de filtro da Busca
+                        searchInput.addEventListener('input', (e) => {
+                            const term = e.target.value.toLowerCase();
+
+                            const categoryGroups = form.querySelectorAll('.category-group');
+                            categoryGroups.forEach(group => {
+                                let hasVisibleItems = false;
+                                const items = group.querySelectorAll('.checkbox'); // Pega todos os departamentos deste grupo
+
+                                items.forEach(item => {
+                                    const text = item.textContent.toLowerCase();
+                                    if (text.includes(term)) {
+                                        item.style.display = ''; // Exibe
+                                        hasVisibleItems = true;
+                                    } else {
+                                        item.style.display = 'none'; // Esconde
+                                    }
+                                });
+
+                                // Se não houver itens visíveis na categoria, esconde o card todo
+                                group.style.display = hasVisibleItems ? 'block' : 'none';
+                            });
+                        });
+
+                        controlsDiv.appendChild(globalToggleBtn);
+                        controlsDiv.appendChild(searchInput);
+                        controlsDiv.appendChild(closeBtn);
+                        headerContainer.appendChild(controlsDiv);
+
+                        // Marca que o Header já possui os controles para não duplicá-los no futuro
+                        legend.dataset.enhanced = "true";
+                    }
+
+                    // --- ADIÇÃO DO RODAPÉ FIXO ---
+                    const footer = form.querySelector('.modal-footer');
+                    if (footer && !footer.dataset.enhanced) {
+                        footer.style.flexShrink = '0'; // Garante que o rodapé fica cravado no final da coluna
+                        footer.style.backgroundColor = '#fff';
+                        footer.style.borderTop = '1px solid #e5e5e5';
+                        footer.style.padding = '15px';
+                        footer.style.margin = '0';
+
+                        footer.dataset.enhanced = "true";
+                    }
+
+                    // Busca o container da grade (pela marcação anterior ou caindo para a original do Angular)
+                    let container = form.querySelector('[data-grid-container="true"]');
+                    if (!container) {
+                        const containers = form.querySelectorAll('div[style*="max-height"]');
+                        container = Array.from(containers).find(el => el.style.overflowY === 'auto' || el.style.maxHeight);
+                    }
+
+                    if (container) {
+                        // Busca checkboxes que AINDA NÃO estão dentro de um grupo nosso
+                        const unorganizedCheckboxes = Array.from(container.querySelectorAll('.checkbox')).filter(cb => !cb.closest('.category-group'));
+
+                        // Se encontrou checkboxes soltos, significa que o Angular acabou de renderizá-los
+                        if (unorganizedCheckboxes.length > 0) {
+                            // Limpa os grupos antigos (e os checkboxes zumbis dentro deles) da última abertura
+                            container.querySelectorAll('.category-group').forEach(el => el.remove());
+
+                            // Reorganiza utilizando apenas os checkboxes mais recentes
+                            reorganizeDOM(container, unorganizedCheckboxes);
+
+                            // Se houver algum texto pendente na Busca, aciona ela para os itens recém-renderizados!
+                            const searchInput = document.getElementById('cabonnet-dept-search');
+                            if (searchInput && searchInput.value) {
+                                searchInput.dispatchEvent(new Event('input'));
+                            }
+
+                            // Auto-Focus: Dá foco imediato na barra de busca para digitação rápida sem precisar usar o mouse
+                            setTimeout(() => {
+                                if (searchInput) searchInput.focus();
+                            }, 50);
+                        }
                     }
                 }
             }
         }
     });
 
-    observert.observe(document.body, { childList: true, subtree: true });
-    setInterval(checkModalAndManageButtons, 100);
+    observer.observe(document.body, { childList: true, subtree: true });
 
 })();
