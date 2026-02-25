@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hi - Mapa de Calor no Dashboard
 // @namespace    http://tampermonkey.net/
-// @version      1.5
+// @version      1.8
 // @description  Substitui o painel de fila de espera pelo mapa de calor
 // @match        https://www5.directtalk.com.br/static/beta/admin/main.html*
 // @grant        GM_xmlhttpRequest
@@ -23,16 +23,25 @@ Chart.register(ChartDataLabels);
     const REFRESH_INTERVAL = 60000; // Auto refresh every 60 seconds
     const WORDS_TO_REMOVE = ['Cabonnet', 'WhatsApp', 'Whatsapp']; // Palavras que serão omitidas dos nomes das filas
 
+    const FILTER_DEPARTMENTS = [
+        'SAC', 'HELP', 'FALHA API', 'AGENDAMENTO', 'CASOS CRÍTICOS',
+        'CHURN SAFRA', 'COBRANÇA', 'COPE', 'ESCRITÓRIO', 'N3',
+        'REFIDELIZAÇÃO', 'RETENÇÃO', 'VENDAS', 'LOJA'
+    ];
+
     let currentChart = null;
     let widgetContainer = null;
     let chartWrapper = null;
     let canvasElement = null;
     let totalDisplayElement = null;
+    let breakdownDisplayElement = null; // NOVO: Elemento para mostrar o total por departamento
     let loadingElement = null;
     let lastUpdateElement = null;
     let isFetching = false;
     let refreshTimer = null; // Added to prevent duplicate intervals on SPA navigation
     let heatMapContainer = null; // Referência para o sincronismo de layout
+    let filterPanelElement = null; // NOVO: Painel de filtros
+    let lastRawData = {}; // NOVO: Armazena os dados brutos antes do filtro
 
     function waitForChartJS() {
         if (typeof Chart === 'undefined') {
@@ -64,6 +73,11 @@ Chart.register(ChartDataLabels);
         const red = Math.floor((value / 30) * 255);
         const green = Math.floor(((30 - value) / 30) * 255);
         return `rgba(${red}, ${green}, 0, 0.7)`;
+    }
+
+    // Normaliza strings para comparação (remove acentos e deixa maiúsculo)
+    function normalizeStr(str) {
+        return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
     }
 
     function syncLeftPanelHeight() {
@@ -142,6 +156,17 @@ Chart.register(ChartDataLabels);
         refreshBtn.style.cssText = "background: none; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; padding: 2px 8px; margin-right: 5px;";
         refreshBtn.addEventListener('click', () => { fetchAndAnalyze(true); });
 
+        // Filter Button (Gear Icon)
+        const filterBtn = document.createElement('button');
+        filterBtn.innerHTML = '&#9881;'; // Ícone de engrenagem
+        filterBtn.title = "Filtrar Departamentos";
+        filterBtn.style.cssText = "background: none; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; padding: 2px 8px; margin-right: 5px; font-size: 16px;";
+        filterBtn.addEventListener('click', () => {
+            const isHidden = filterPanelElement.style.display === 'none';
+            filterPanelElement.style.display = isHidden ? 'block' : 'none';
+            syncLeftPanelHeight();
+        });
+
         // Simulate Button (Flask Icon)
         const simBtn = document.createElement('button');
         simBtn.innerHTML = '&#129514;';
@@ -157,11 +182,71 @@ Chart.register(ChartDataLabels);
         copyBtn.addEventListener('click', copyChartToClipboard);
 
         controls.appendChild(refreshBtn);
+        controls.appendChild(filterBtn);
         //controls.appendChild(simBtn);
         controls.appendChild(copyBtn);
         header.appendChild(title);
         header.appendChild(controls);
         targetElement.appendChild(header);
+
+        // --- 1.5. Filter Panel ---
+        filterPanelElement = document.createElement('div');
+        filterPanelElement.style.cssText = "display: none; background: #f8f9fa; padding: 15px; border: 1px solid #dee2e6; border-radius: 4px; margin-bottom: 15px; flex-shrink: 0;";
+
+        const filterTitle = document.createElement('div');
+        filterTitle.innerHTML = "<strong style='color: #333;'>Filtrar Departamentos:</strong>";
+        filterTitle.style.marginBottom = "10px";
+
+        const filterButtons = document.createElement('div');
+        filterButtons.style.marginBottom = "15px";
+
+        const btnSelectAll = document.createElement('button');
+        btnSelectAll.textContent = "Selecionar Todos";
+        btnSelectAll.style.cssText = "background: #0d6efd; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; margin-right: 10px; font-size: 12px; font-weight: bold;";
+
+        const btnClearAll = document.createElement('button');
+        btnClearAll.textContent = "Limpar Seleção";
+        btnClearAll.style.cssText = "background: #0d6efd; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;";
+
+        filterButtons.appendChild(btnSelectAll);
+        filterButtons.appendChild(btnClearAll);
+
+        const filterGrid = document.createElement('div');
+        filterGrid.style.cssText = "display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px;";
+
+        let savedFilters = JSON.parse(localStorage.getItem('heatmap_filters')) || FILTER_DEPARTMENTS;
+
+        FILTER_DEPARTMENTS.forEach(dep => {
+            const label = document.createElement('label');
+            label.style.cssText = "display: flex; align-items: center; cursor: pointer; font-size: 13px; color: #333; font-weight: 500;";
+
+            const chk = document.createElement('input');
+            chk.type = 'checkbox';
+            chk.value = dep;
+            chk.checked = savedFilters.includes(dep);
+            chk.style.marginRight = "6px";
+            chk.style.cursor = "pointer";
+            chk.addEventListener('change', saveFiltersAndApply);
+
+            label.appendChild(chk);
+            label.appendChild(document.createTextNode(dep));
+            filterGrid.appendChild(label);
+        });
+
+        btnSelectAll.addEventListener('click', () => {
+            filterGrid.querySelectorAll('input[type="checkbox"]').forEach(c => c.checked = true);
+            saveFiltersAndApply();
+        });
+
+        btnClearAll.addEventListener('click', () => {
+            filterGrid.querySelectorAll('input[type="checkbox"]').forEach(c => c.checked = false);
+            saveFiltersAndApply();
+        });
+
+        filterPanelElement.appendChild(filterTitle);
+        filterPanelElement.appendChild(filterButtons);
+        filterPanelElement.appendChild(filterGrid);
+        targetElement.appendChild(filterPanelElement);
 
         // --- 2. Scrollable Container ---
         widgetContainer = document.createElement('div');
@@ -194,6 +279,9 @@ Chart.register(ChartDataLabels);
         const footer = document.createElement('div');
         footer.style.cssText = "margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px; text-align: center; flex-shrink: 0;";
 
+        breakdownDisplayElement = document.createElement('div');
+        breakdownDisplayElement.style.cssText = "font-size: 13px; color: #444; margin-bottom: 12px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-height: 80px; overflow-y: auto;";
+
         totalDisplayElement = document.createElement('div');
         totalDisplayElement.style.fontWeight = 'bold';
         totalDisplayElement.style.fontSize = '16px';
@@ -202,6 +290,7 @@ Chart.register(ChartDataLabels);
         lastUpdateElement.style.fontSize = '11px';
         lastUpdateElement.style.color = '#999';
 
+        footer.appendChild(breakdownDisplayElement);
         footer.appendChild(totalDisplayElement);
         footer.appendChild(lastUpdateElement);
         targetElement.appendChild(footer);
@@ -215,6 +304,41 @@ Chart.register(ChartDataLabels);
         setTimeout(syncLeftPanelHeight, 100);
     }
 
+    function saveFiltersAndApply() {
+        if (!filterPanelElement) return;
+        const checkboxes = filterPanelElement.querySelectorAll('input[type="checkbox"]');
+        const activeFilters = Array.from(checkboxes).filter(c => c.checked).map(c => c.value);
+        localStorage.setItem('heatmap_filters', JSON.stringify(activeFilters));
+        applyFiltersAndUpdateChart();
+    }
+
+    function applyFiltersAndUpdateChart() {
+        let savedFilters = JSON.parse(localStorage.getItem('heatmap_filters')) || FILTER_DEPARTMENTS;
+
+        let filteredData = {};
+        let total = 0;
+        let breakdownText = [];
+
+        for (const [deptName, count] of Object.entries(lastRawData)) {
+            // Verifica se o departamento se enquadra em algum dos filtros selecionados (ignora acentos)
+            const isMatch = savedFilters.some(filter =>
+                normalizeStr(deptName).includes(normalizeStr(filter))
+            );
+
+            if (isMatch) {
+                filteredData[deptName] = count;
+                total += count;
+                breakdownText.push(`${deptName}: ${count}`);
+            }
+        }
+
+        const sortedDepartments = Object.fromEntries(
+            Object.entries(filteredData).sort(([,a], [,b]) => b - a)
+        );
+
+        updateChart(sortedDepartments, total, breakdownText);
+    }
+
     // --- SIMULATION LOGIC ---
     function simulateQueueData() {
         if(loadingElement) {
@@ -225,12 +349,7 @@ Chart.register(ChartDataLabels);
 
         setTimeout(() => {
             const totalCustomers = Math.floor(Math.random() * (150 - 20 + 1)) + 20;
-            const allDepartments = [
-                 'Cabonnet - Chat Help', 'Cabonnet - Chat SAC', 'Cabonnet Adamantina', 'Cabonnet Assis',
-                 'Cabonnet Bastos', 'Cabonnet Caçapava', 'Cabonnet GoodU', 'Cabonnet Lins',
-                 'Cabonnet Ourinhos', 'Cabonnet Penápolis', 'Cabonnet Pindamonhangaba',
-                 'Cabonnet Prudente', 'Cabonnet Santa Cruz', 'Cabonnet Taubaté', 'Cabonnet Tupã'
-            ];
+            const allDepartments = [...FILTER_DEPARTMENTS]; // Usa os departamentos configurados no filtro
 
             let departments = {};
             let remainingCustomers = totalCustomers;
@@ -249,13 +368,8 @@ Chart.register(ChartDataLabels);
                  tempDepts.splice(idx, 1);
             }
 
-            // Convert to sorted object
-            const sortedDepartments = Object.fromEntries(
-                Object.entries(departments).sort(([,a], [,b]) => b - a)
-            );
-            const total = Object.values(sortedDepartments).reduce((sum, count) => sum + count, 0);
-
-            updateChart(sortedDepartments, total);
+            lastRawData = departments;
+            applyFiltersAndUpdateChart();
             lastUpdateElement.textContent = "Modo: Simulação (Teste)";
 
         }, 500);
@@ -320,20 +434,27 @@ Chart.register(ChartDataLabels);
             }
         });
 
-        const sortedDepartments = Object.fromEntries(
-            Object.entries(departments).sort(([,a], [,b]) => b - a)
-        );
-        const totalCustomers = Object.values(sortedDepartments).reduce((sum, count) => sum + count, 0);
-
-        updateChart(sortedDepartments, totalCustomers);
+        lastRawData = departments;
+        applyFiltersAndUpdateChart();
     }
 
-    function updateChart(data, total) {
+    function updateChart(data, total, breakdownTextArr) {
         if (!canvasElement) return;
 
         loadingElement.style.display = 'none';
         chartWrapper.style.display = 'block';
         chartWrapper.style.opacity = '1';
+
+        // Atualiza a exibição do Breakdown (SAC: 3, Help: 4...)
+        breakdownDisplayElement.innerHTML = '';
+        if (breakdownTextArr && breakdownTextArr.length > 0) {
+            breakdownTextArr.forEach(text => {
+                const badge = document.createElement('span');
+                badge.style.cssText = "background: #e9ecef; padding: 4px 10px; border-radius: 12px; font-weight: 600; border: 1px solid #ced4da; white-space: nowrap;";
+                badge.textContent = text;
+                breakdownDisplayElement.appendChild(badge);
+            });
+        }
 
         totalDisplayElement.textContent = `Total na Fila: ${total}`;
         const now = new Date();
