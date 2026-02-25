@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hi - Mapa de Calor no Dashboard
 // @namespace    http://tampermonkey.net/
-// @version      1.8
+// @version      1.9
 // @description  Substitui o painel de fila de espera pelo mapa de calor
 // @match        https://www5.directtalk.com.br/static/beta/admin/main.html*
 // @grant        GM_xmlhttpRequest
