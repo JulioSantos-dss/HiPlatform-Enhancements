@@ -7,8 +7,8 @@
 // @grant        GM_xmlhttpRequest
 // @require      https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js
 // @require      https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0
-// @downloadURL  
-// @updateURL
+// @downloadURL  https://raw.githubusercontent.com/JulioSantos-dss/HiPlatform-Enhancements/main/Hi%20-%20Mapa%20de%20Calor%20no%20Dashboard.user.js
+// @updateURL    https://raw.githubusercontent.com/JulioSantos-dss/HiPlatform-Enhancements/main/Hi%20-%20Mapa%20de%20Calor%20no%20Dashboard.user.js
 // ==/UserScript==
 
 /* global Chart, ChartDataLabels, GM_xmlhttpRequest */
