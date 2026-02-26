@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hi - Mapa de Calor no Dashboard
 // @namespace    http://tampermonkey.net/
-// @version      2.0
+// @version      2.2
 // @description  Substitui o painel de fila de espera pelo mapa de calor
 // @match        https://www5.directtalk.com.br/static/beta/admin/main.html*
 // @grant        GM_xmlhttpRequest
@@ -214,7 +214,8 @@ Chart.register(ChartDataLabels);
         const filterGrid = document.createElement('div');
         filterGrid.style.cssText = "display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px;";
 
-        let savedFilters = JSON.parse(localStorage.getItem('heatmap_filters')) || FILTER_DEPARTMENTS;
+        // Começa com array vazio (nenhum filtro selecionado = mostra tudo)
+        let savedFilters = JSON.parse(localStorage.getItem('heatmap_filters')) || [];
 
         FILTER_DEPARTMENTS.forEach(dep => {
             const label = document.createElement('label');
@@ -313,22 +314,41 @@ Chart.register(ChartDataLabels);
     }
 
     function applyFiltersAndUpdateChart() {
-        let savedFilters = JSON.parse(localStorage.getItem('heatmap_filters')) || FILTER_DEPARTMENTS;
+        let savedFilters = JSON.parse(localStorage.getItem('heatmap_filters')) || [];
 
         let filteredData = {};
+        let filterBreakdown = {}; // Novo objeto para consolidar por filtro selecionado
         let total = 0;
         let breakdownText = [];
 
         for (const [deptName, count] of Object.entries(lastRawData)) {
-            // Verifica se o departamento se enquadra em algum dos filtros selecionados (ignora acentos)
-            const isMatch = savedFilters.some(filter =>
-                normalizeStr(deptName).includes(normalizeStr(filter))
-            );
+            let matchedFilters = [];
+
+            // Se houver filtros salvos, verifica se o departamento corresponde a algum deles
+            if (savedFilters.length > 0) {
+                matchedFilters = savedFilters.filter(filter =>
+                    normalizeStr(deptName).includes(normalizeStr(filter))
+                );
+            }
+
+            const isMatch = savedFilters.length === 0 || matchedFilters.length > 0;
 
             if (isMatch) {
                 filteredData[deptName] = count;
                 total += count;
-                breakdownText.push(`${deptName}: ${count}`);
+
+                // Se estamos filtrando, consolidamos o total na "categoria" (filtro) principal
+                if (savedFilters.length > 0) {
+                    const primaryFilter = matchedFilters[0]; // Pega o primeiro filtro que deu "match"
+                    filterBreakdown[primaryFilter] = (filterBreakdown[primaryFilter] || 0) + count;
+                }
+            }
+        }
+
+        // Transforma o objeto consolidado de volta em um array de textos para as pílulas
+        if (savedFilters.length > 0) {
+            for (const [filterName, filterTotal] of Object.entries(filterBreakdown)) {
+                breakdownText.push(`${filterName}: ${filterTotal}`);
             }
         }
 
