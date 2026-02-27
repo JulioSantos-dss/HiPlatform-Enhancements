@@ -182,7 +182,7 @@ Chart.register(ChartDataLabels);
         copyBtn.addEventListener('click', copyChartToClipboard);
 
         const clrall = document.createElement('button');
-        clrall.textContent = "Mostrar Tudo";
+        clrall.textContent = "Limpar Filtro";
         clrall.style.cssText = "background: #0d6efd; color: white; border: none; cursor: pointer; padding: 2px 8px; border-radius: 4px; margin-right: 5px;"; //MUDAR DEPOIS
         clrall.addEventListener('click', () => {
             filterGrid.querySelectorAll('input[type="checkbox"]').forEach(c => c.checked = false);
@@ -214,7 +214,7 @@ Chart.register(ChartDataLabels);
         btnSelectAll.style.cssText = "background: #0d6efd; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; margin-right: 10px; font-size: 12px; font-weight: bold;";
 
         const btnClearAll = document.createElement('button');
-        btnClearAll.textContent = "Limpar Seleção";
+        btnClearAll.textContent = "Limpar Filtro";
         btnClearAll.style.cssText = "background: #0d6efd; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;";
 
         filterButtons.appendChild(btnSelectAll);
