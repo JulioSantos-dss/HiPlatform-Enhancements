@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hi - Mapa de Calor no Dashboard
 // @namespace    http://tampermonkey.net/
-// @version      2.2
+// @version      2.5
 // @description  Substitui o painel de fila de espera pelo mapa de calor
 // @match        https://www5.directtalk.com.br/static/beta/admin/main.html*
 // @grant        GM_xmlhttpRequest
@@ -181,6 +181,15 @@ Chart.register(ChartDataLabels);
         copyBtn.style.cssText = "background: none; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; padding: 2px 8px;";
         copyBtn.addEventListener('click', copyChartToClipboard);
 
+        const clrall = document.createElement('button');
+        clrall.textContent = "Mostrar Tudo";
+        clrall.style.cssText = "background: #0d6efd; color: white; border: none; cursor: pointer; padding: 2px 8px; border-radius: 4px; margin-right: 5px;"; //MUDAR DEPOIS
+        clrall.addEventListener('click', () => {
+            filterGrid.querySelectorAll('input[type="checkbox"]').forEach(c => c.checked = false);
+            saveFiltersAndApply();
+        });
+
+        controls.appendChild(clrall);
         controls.appendChild(refreshBtn);
         controls.appendChild(filterBtn);
         //controls.appendChild(simBtn);
@@ -314,50 +323,48 @@ Chart.register(ChartDataLabels);
     }
 
     function applyFiltersAndUpdateChart() {
-        let savedFilters = JSON.parse(localStorage.getItem('heatmap_filters')) || [];
+        let savedFilters = JSON.parse(localStorage.getItem('heatmap_filters')) || [];
 
-        let filteredData = {};
-        let filterBreakdown = {}; // Novo objeto para consolidar por filtro selecionado
-        let total = 0;
-        let breakdownText = [];
+        let filteredData = {};
+        let filterBreakdown = {}; // Consolida os totais por categoria
+        let total = 0;
+        let breakdownText = [];
 
-        for (const [deptName, count] of Object.entries(lastRawData)) {
-            let matchedFilters = [];
+        for (const [deptName, count] of Object.entries(lastRawData)) {
+            // 1. Verifica a qual "Pílula" esse departamento pertence comparando 
+            // contra a lista master (FILTER_DEPARTMENTS), independente do filtro aplicado
+            let matchedCategories = FILTER_DEPARTMENTS.filter(filter =>
+                normalizeStr(deptName).includes(normalizeStr(filter))
+            );
 
-            // Se houver filtros salvos, verifica se o departamento corresponde a algum deles
-            if (savedFilters.length > 0) {
-                matchedFilters = savedFilters.filter(filter =>
-                    normalizeStr(deptName).includes(normalizeStr(filter))
-                );
-            }
+            // Se encontrar um match na sua lista, usa ele. Se for um departamento novo/desconhecido, usa o próprio nome.
+            const primaryCategory = matchedCategories.length > 0 ? matchedCategories[0] : deptName;
 
-            const isMatch = savedFilters.length === 0 || matchedFilters.length > 0;
+            // 2. Verifica se o departamento deve aparecer no gráfico de barras (isMatch)
+            const isMatch = savedFilters.length === 0 || savedFilters.some(filter =>
+                normalizeStr(deptName).includes(normalizeStr(filter))
+            );
 
-            if (isMatch) {
-                filteredData[deptName] = count;
-                total += count;
+            if (isMatch) {
+                filteredData[deptName] = count;
+                total += count;
 
-                // Se estamos filtrando, consolidamos o total na "categoria" (filtro) principal
-                if (savedFilters.length > 0) {
-                    const primaryFilter = matchedFilters[0]; // Pega o primeiro filtro que deu "match"
-                    filterBreakdown[primaryFilter] = (filterBreakdown[primaryFilter] || 0) + count;
-                }
-            }
-        }
+                // Sempre consolida o total na "categoria" principal (para gerar as pílulas)
+                filterBreakdown[primaryCategory] = (filterBreakdown[primaryCategory] || 0) + count;
+            }
+        }
 
-        // Transforma o objeto consolidado de volta em um array de textos para as pílulas
-        if (savedFilters.length > 0) {
-            for (const [filterName, filterTotal] of Object.entries(filterBreakdown)) {
-                breakdownText.push(`${filterName}: ${filterTotal}`);
-            }
-        }
+        // Sempre transforma o objeto consolidado no array de textos para as pílulas (removemos o IF)
+        for (const [filterName, filterTotal] of Object.entries(filterBreakdown)) {
+            breakdownText.push(`${filterName}: ${filterTotal}`);
+        }
 
-        const sortedDepartments = Object.fromEntries(
-            Object.entries(filteredData).sort(([,a], [,b]) => b - a)
-        );
+        const sortedDepartments = Object.fromEntries(
+            Object.entries(filteredData).sort(([,a], [,b]) => b - a)
+        );
 
-        updateChart(sortedDepartments, total, breakdownText);
-    }
+        updateChart(sortedDepartments, total, breakdownText);
+    }
 
     // --- SIMULATION LOGIC ---
     function simulateQueueData() {
