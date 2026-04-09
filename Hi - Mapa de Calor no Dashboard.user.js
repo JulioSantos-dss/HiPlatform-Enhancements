@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hi - Mapa de Calor no Dashboard
 // @namespace    http://tampermonkey.net/
-// @version      2.5
+// @version      2.6
 // @description  Substitui o painel de fila de espera pelo mapa de calor
 // @match        https://www5.directtalk.com.br/static/beta/admin/main.html*
 // @grant        GM_xmlhttpRequest
@@ -21,7 +21,7 @@ Chart.register(ChartDataLabels);
     const DATA_SOURCE_URL = 'https://www5.directtalk.com.br/admin/interactive/inter_home_userfila.asp';
     const TARGET_SELECTOR = "#dt-style-content > div.row.animate.ng-scope > div.container.ng-scope > div:nth-child(4) > div:nth-child(4)";
     const REFRESH_INTERVAL = 60000; // Auto refresh every 60 seconds
-    const WORDS_TO_REMOVE = ['Cabonnet', 'WhatsApp', 'Whatsapp']; // Palavras que serão omitidas dos nomes das filas
+    const WORDS_TO_REMOVE = ['Cabonnet', 'WhatsApp', 'Whatsapp', '1028']; // Palavras que serão omitidas dos nomes das filas
 
     const FILTER_DEPARTMENTS = [
         'SAC', 'HELP', 'FALHA API', 'AGENDAMENTO', 'CASOS CRÍTICOS',
