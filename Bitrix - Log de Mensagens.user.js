@@ -1,7 +1,7 @@
 // ==UserScript==
     // @name         Bitrix - Log de Mensagens
     // @namespace    http://tampermonkey.net/
-    // @version      4.5
+    // @version      4.6
     // @description  Captura Notificações, UI editável, CSV. Indicador visual na caixa de texto, Ghost fixo e Espião no right-click.
     // @author       Julio Santos feat. AI
     // @match        https://*.bitrix24.com*/*
@@ -917,7 +917,7 @@
                     // 1. Botão do FANTASMA (Clique Nativo Silencioso)
                     const ghostBtn = document.createElement('div');
                     ghostBtn.className = 'bitrix-ghost-btn';
-                    ghostBtn.innerHTML = '👻';
+                    ghostBtn.innerHTML = '👀';
                     ghostBtn.title = 'Abrir no Bitrix (Sem registrar leitura)';
                     ghostBtn.style.cssText = `
                         position: absolute;
