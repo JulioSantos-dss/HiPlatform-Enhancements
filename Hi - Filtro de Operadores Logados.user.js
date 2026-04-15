@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Hi - Filtro de Operadores Logados
 // @namespace    http://tampermonkey.net/
-// @version      2.0
-// @description  Filtro de Operadores com Interface Moderna (Searchbox outside panel)
+// @version      2.1
+// @description  Filtro de Operadores com Interface Moderna e Agrupamento por Departamentos
 // @author       Julio Santos feat. AI
 // @match        https://www5.directtalk.com.br/static/beta/admin/main.html*
 // @grant        none
@@ -30,162 +30,140 @@
         { label: 'Outros', value: 'Outros' }
     ];
 
-function createSearchAndToggleButton() {
-    console.log('[FilterScript] createSearchAndToggleButton called.'); // DEBUG
+    function createSearchAndToggleButton() {
+        console.log('[FilterScript] createSearchAndToggleButton called.'); // DEBUG
 
-    // Remove existing wrapper if any, to prevent duplicates on re-init
-    const existingWrapper = document.querySelector('div[data-userscript-filter="search-toggle-wrapper"]');
-    if (existingWrapper) {
-        console.log('[FilterScript] Removing existing search/toggle wrapper.');
-        existingWrapper.remove();
-    }
-
-    const searchToggleWrapper = document.createElement('div');
-    searchToggleWrapper.style.display = 'inline-flex';
-    searchToggleWrapper.style.alignItems = 'center';
-    searchToggleWrapper.style.marginLeft = '10px';
-    searchToggleWrapper.style.position = 'relative';
-    searchToggleWrapper.style.zIndex = '1001';
-    searchToggleWrapper.setAttribute('data-userscript-filter', 'search-toggle-wrapper'); // Mark our element
-
-    let toggleButton = document.createElement('button');
-    toggleButton.textContent = 'Filtrar Departamentos...';
-    toggleButton.style.padding = '10px 15px';
-    toggleButton.style.backgroundColor = '#007bff';
-    toggleButton.style.color = '#fff';
-    toggleButton.style.border = 'none';
-    toggleButton.style.borderRadius = '5px 0 0 5px';
-    toggleButton.style.cursor = 'pointer';
-    toggleButton.style.fontFamily = 'Arial, sans-serif';
-    toggleButton.style.fontSize = '14px';
-    toggleButton.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
-    toggleButton.style.fontWeight = 'normal';
-    toggleButton.style.height = '38px';
-    // Prevent the button from shrinking
-    toggleButton.style.flexShrink = '0';
-
-
-    toggleButton.addEventListener('mouseover', () => { toggleButton.style.backgroundColor = '#0056b3'; });
-    toggleButton.addEventListener('mouseout', () => { toggleButton.style.backgroundColor = '#007bff'; });
-    toggleButton.addEventListener('click', function() {
-        let panel = document.getElementById('filterPanel');
-        if (!panel) {
-            console.warn('[FilterScript] Filter panel not found on toggle click!');
-            return;
+        const existingWrapper = document.querySelector('div[data-userscript-filter="search-toggle-wrapper"]');
+        if (existingWrapper) {
+            existingWrapper.remove();
         }
-        if (panel.style.display === 'none' || panel.style.display === '') {
-            panel.style.display = 'block';
-            document.body.classList.add('filter-open');
-            // Assuming updateCheckboxCounts is defined elsewhere
-            updateCheckboxCounts();
-        } else {
-            panel.style.display = 'none';
-            document.body.classList.remove('filter-open');
-        }
-    });
 
-    // Create a wrapper for the input and the clear button
-    const inputWrapper = document.createElement('div');
-    inputWrapper.style.position = 'relative';
-    inputWrapper.style.display = 'flex';
-    inputWrapper.style.alignItems = 'center';
+        const searchToggleWrapper = document.createElement('div');
+        searchToggleWrapper.style.display = 'inline-flex';
+        searchToggleWrapper.style.alignItems = 'center';
+        searchToggleWrapper.style.marginLeft = '10px';
+        searchToggleWrapper.style.position = 'relative';
+        searchToggleWrapper.style.zIndex = '1001';
+        searchToggleWrapper.setAttribute('data-userscript-filter', 'search-toggle-wrapper');
 
-    externalSearchInput = document.createElement('input');
-    externalSearchInput.type = 'text';
-    externalSearchInput.id = 'externalOperatorSearch';
-    externalSearchInput.placeholder = 'Buscar...';
-    externalSearchInput.style.padding = '10px 30px 10px 10px'; // Add padding to the right for the 'X'
-    externalSearchInput.style.border = '1px solid #ccc';
-    externalSearchInput.style.borderRadius = '0 5px 5px 0';
-    externalSearchInput.style.marginLeft = '-1px'; // Overlap borders
-    externalSearchInput.style.fontFamily = 'Arial, sans-serif';
-    externalSearchInput.style.fontSize = '14px';
-    externalSearchInput.style.height = '38px';
-    externalSearchInput.style.boxSizing = 'border-box';
-    externalSearchInput.style.width = '200px';
+        let toggleButton = document.createElement('button');
+        toggleButton.textContent = 'Filtrar Departamentos...';
+        toggleButton.style.padding = '10px 15px';
+        toggleButton.style.backgroundColor = '#007bff';
+        toggleButton.style.color = '#fff';
+        toggleButton.style.border = 'none';
+        toggleButton.style.borderRadius = '5px 0 0 5px';
+        toggleButton.style.cursor = 'pointer';
+        toggleButton.style.fontFamily = 'Arial, sans-serif';
+        toggleButton.style.fontSize = '14px';
+        toggleButton.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+        toggleButton.style.fontWeight = 'normal';
+        toggleButton.style.height = '38px';
+        toggleButton.style.flexShrink = '0';
 
-    // Create the clear button ('X')
-    const clearButton = document.createElement('span');
-    clearButton.innerHTML = '&times;'; // Use HTML entity for a nice 'X'
-    clearButton.style.position = 'absolute';
-    clearButton.style.right = '10px';
-    clearButton.style.top = '50%';
-    clearButton.style.transform = 'translateY(-50%)';
-    clearButton.style.cursor = 'pointer';
-    clearButton.style.color = '#888';
-    clearButton.style.fontSize = '20px';
-    clearButton.style.fontWeight = 'bold';
-    clearButton.style.display = 'none'; // Initially hidden
+        toggleButton.addEventListener('mouseover', () => { toggleButton.style.backgroundColor = '#0056b3'; });
+        toggleButton.addEventListener('mouseout', () => { toggleButton.style.backgroundColor = '#007bff'; });
+        toggleButton.addEventListener('click', function() {
+            let panel = document.getElementById('filterPanel');
+            if (!panel) return;
 
-    // Function to show/hide the clear button based on input value
-    const toggleClearButton = () => {
-        if (externalSearchInput.value) {
-            clearButton.style.display = 'block';
-        } else {
-            clearButton.style.display = 'none';
-        }
-    };
+            if (panel.style.display === 'none' || panel.style.display === '') {
+                panel.style.display = 'block';
+                document.body.classList.add('filter-open');
+                updateCheckboxCounts();
+            } else {
+                panel.style.display = 'none';
+                document.body.classList.remove('filter-open');
+            }
+        });
 
-    // Event listener for the clear button
-    clearButton.addEventListener('click', () => {
-        externalSearchInput.value = '';
-        localStorage.removeItem('operatorFilter'); // Use removeItem for clarity
-        // Assuming applyFilter is defined elsewhere
-        applyFilter('');
+        const inputWrapper = document.createElement('div');
+        inputWrapper.style.position = 'relative';
+        inputWrapper.style.display = 'flex';
+        inputWrapper.style.alignItems = 'center';
+
+        externalSearchInput = document.createElement('input');
+        externalSearchInput.type = 'text';
+        externalSearchInput.id = 'externalOperatorSearch';
+        externalSearchInput.placeholder = 'Buscar...';
+        externalSearchInput.style.padding = '10px 30px 10px 10px';
+        externalSearchInput.style.border = '1px solid #ccc';
+        externalSearchInput.style.borderRadius = '0 5px 5px 0';
+        externalSearchInput.style.marginLeft = '-1px';
+        externalSearchInput.style.fontFamily = 'Arial, sans-serif';
+        externalSearchInput.style.fontSize = '14px';
+        externalSearchInput.style.height = '38px';
+        externalSearchInput.style.boxSizing = 'border-box';
+        externalSearchInput.style.width = '200px';
+
+        const clearButton = document.createElement('span');
+        clearButton.innerHTML = '&times;';
+        clearButton.style.position = 'absolute';
+        clearButton.style.right = '10px';
+        clearButton.style.top = '50%';
+        clearButton.style.transform = 'translateY(-50%)';
+        clearButton.style.cursor = 'pointer';
+        clearButton.style.color = '#888';
+        clearButton.style.fontSize = '20px';
+        clearButton.style.fontWeight = 'bold';
+        clearButton.style.display = 'none';
+
+        const toggleClearButton = () => {
+            if (externalSearchInput.value) {
+                clearButton.style.display = 'block';
+            } else {
+                clearButton.style.display = 'none';
+            }
+        };
+
+        clearButton.addEventListener('click', () => {
+            externalSearchInput.value = '';
+            localStorage.removeItem('operatorFilter');
+            applyFilter('');
+            toggleClearButton();
+            externalSearchInput.focus();
+        });
+
+        externalSearchInput.addEventListener('focus', () => {
+            externalSearchInput.style.borderColor = '#007bff';
+            externalSearchInput.style.boxShadow = '0 0 0 0.2rem rgba(0,123,255,.25)';
+        });
+        externalSearchInput.addEventListener('blur', () => {
+            externalSearchInput.style.borderColor = '#ccc';
+            externalSearchInput.style.boxShadow = 'none';
+        });
+
+        externalSearchInput.value = localStorage.getItem('operatorFilter') || '';
         toggleClearButton();
-        externalSearchInput.focus(); // Return focus to the input
-    });
 
-    externalSearchInput.addEventListener('focus', () => {
-        externalSearchInput.style.borderColor = '#007bff';
-        externalSearchInput.style.boxShadow = '0 0 0 0.2rem rgba(0,123,255,.25)';
-    });
-    externalSearchInput.addEventListener('blur', () => {
-        externalSearchInput.style.borderColor = '#ccc';
-        externalSearchInput.style.boxShadow = 'none';
-    });
+        externalSearchInput.addEventListener('input', function() {
+            let filterValue = externalSearchInput.value.toLowerCase();
+            localStorage.setItem('operatorFilter', filterValue);
+            applyFilter(filterValue);
+            toggleClearButton();
+        });
 
-    // Restore value from localStorage and add input event listener
-    externalSearchInput.value = localStorage.getItem('operatorFilter') || '';
-    toggleClearButton(); // Check if the button should be visible on load
+        inputWrapper.appendChild(externalSearchInput);
+        inputWrapper.appendChild(clearButton);
 
-    externalSearchInput.addEventListener('input', function() {
-        let filterValue = externalSearchInput.value.toLowerCase();
-        localStorage.setItem('operatorFilter', filterValue);
-        // Assuming applyFilter is defined elsewhere
-        applyFilter(filterValue);
-        toggleClearButton(); // Show/hide 'X' on input
-    });
+        searchToggleWrapper.appendChild(toggleButton);
+        searchToggleWrapper.appendChild(inputWrapper);
 
-    // Append elements to their wrappers
-    inputWrapper.appendChild(externalSearchInput);
-    inputWrapper.appendChild(clearButton);
-
-    searchToggleWrapper.appendChild(toggleButton);
-    searchToggleWrapper.appendChild(inputWrapper);
-
-    // Find the header and append the entire search/toggle component
-    let header = [...document.querySelectorAll('h3')].find(h => h.textContent.includes("Operadores"));
-    console.log('[FilterScript] Target header for button/searchbox:', header); // DEBUG
-    if (header) {
-        header.appendChild(searchToggleWrapper);
-        console.log('[FilterScript] Button/searchbox appended to header.'); // DEBUG
-    } else {
-        console.warn('[FilterScript] Could not find H3 header containing "Operadores". Button/searchbox not appended.'); // DEBUG
+        let header = [...document.querySelectorAll('h3')].find(h => h.textContent.includes("Operadores"));
+        if (header) {
+            header.appendChild(searchToggleWrapper);
+        }
     }
-}
 
     function createFilterPanel() {
         console.log('[FilterScript] createFilterPanel called.'); // DEBUG
         let panel = document.getElementById('filterPanel');
         if (panel) {
-            console.log('[FilterScript] Removing existing filter panel.');
             panel.remove();
         }
 
         panel = document.createElement('div');
         panel.id = 'filterPanel';
-        // ... (panel styles and content as before) ...
         const panelStyles = {
             position: 'fixed', left: '0', top: '20px', width: '240px', backgroundColor: '#ffffff',
             padding: '20px', zIndex: '1000', border: '1px solid #eee', borderRadius: '8px',
@@ -244,7 +222,6 @@ function createSearchAndToggleButton() {
         restoreButton.addEventListener('click', restoreOriginalState);
         panel.appendChild(restoreButton);
         document.body.appendChild(panel);
-        console.log('[FilterScript] Filter panel created and appended to body.'); // DEBUG
 
         loadCheckboxStates();
         if (externalSearchInput) applyFilter(externalSearchInput.value); else applyFilter('');
@@ -252,28 +229,21 @@ function createSearchAndToggleButton() {
     }
 
     function saveCheckboxStates() {
-        console.log('[FilterScript] Saving checkbox states.'); // DEBUG
         const states = {};
         const checkboxes = document.querySelectorAll('#filterPanel input[type="checkbox"]');
         checkboxes.forEach(checkbox => {
-            // Use the checkbox ID as the key, and its checked status as the value
             states[checkbox.id] = checkbox.checked;
         });
-        // localStorage can only store strings, so we convert the object to a JSON string
         localStorage.setItem('checkboxStates', JSON.stringify(states));
     }
 
     function loadCheckboxStates() {
-        console.log('[FilterScript] Loading checkbox states.'); // DEBUG
         const savedStates = localStorage.getItem('checkboxStates');
         if (savedStates) {
-            // If we found saved states, parse the JSON string back into an object
             const states = JSON.parse(savedStates);
             for (const id in states) {
-                // Find the checkbox corresponding to each saved ID
                 const checkbox = document.getElementById(id);
                 if (checkbox) {
-                    // Restore its checked state
                     checkbox.checked = states[id];
                 }
             }
@@ -281,7 +251,6 @@ function createSearchAndToggleButton() {
     }
 
     function restoreOriginalState() {
-        console.log('[FilterScript] restoreOriginalState called.'); // DEBUG
         if (externalSearchInput) {
             externalSearchInput.value = '';
         }
@@ -294,50 +263,211 @@ function createSearchAndToggleButton() {
     }
 
     function applyFilter(searchValue) {
-        // console.log('[FilterScript] applyFilter called with searchValue:', searchValue); // DEBUG (can be very noisy)
-        let tableRows = document.querySelectorAll('table.dt-chart-table tbody tr');
-        if (tableRows.length === 0) {
-            // console.warn('[FilterScript] applyFilter: No table rows found with selector "table.dt-chart-table tbody tr"'); // DEBUG
-            // return; // Don't return, allow counts to update to 0
-        }
+        // Encontra estritamente a tabela original e previne selecionar as nossas tabelas clonadas
+        let originalTable = document.querySelector('table.dt-chart-table:not(.custom-cloned-table)');
+        if (!originalTable) return;
+
+        let tableRows = originalTable.querySelectorAll('tbody tr');
+        if (tableRows.length === 0) return;
+
         let selectedFilters = [...document.querySelectorAll('#filterPanel input[type="checkbox"]:checked')]
-            .map(checkbox => checkbox.value.toLowerCase());
+            .map(checkbox => checkbox.value);
         searchValue = (searchValue || "").toLowerCase();
 
-        tableRows.forEach(function(row) {
-            // ... (filtering logic as before) ...
-            let operatorNameCell = row.querySelector('td a');
-            if (!operatorNameCell) return;
-            let operatorName = operatorNameCell.textContent.toLowerCase();
-            let matchesSearch = searchValue === '' || operatorName.includes(searchValue);
-            let matchesCategories = selectedFilters.length === 0 || selectedFilters.some(filter => operatorName.includes(filter));
-            let isOtherCategorySelected = selectedFilters.includes('outros');
-            let matchesOutros = false;
-            if (isOtherCategorySelected) {
-                matchesOutros = !predefinedFilters.slice(0, -1).some(filterDef => operatorName.includes(filterDef.value.toLowerCase()));
-            }
-            let categoryConditionMet = false;
-            if (selectedFilters.length === 0) {
-                categoryConditionMet = true;
-            } else {
-                if (isOtherCategorySelected && matchesOutros) {
-                    categoryConditionMet = true;
+        let customContainer = document.getElementById('custom-filters-container');
+
+        if (!customContainer) {
+            customContainer = document.createElement('div');
+            customContainer.id = 'custom-filters-container';
+            originalTable.parentNode.insertBefore(customContainer, originalTable.nextSibling);
+
+            // Delegação de Eventos Mágica
+            customContainer.addEventListener('click', (e) => {
+                if (e.target.closest('th')) {
+                    const clickedTh = e.target.closest('th');
+                    const cThs = Array.from(clickedTh.closest('thead').querySelectorAll('th'));
+                    const thIndex = cThs.indexOf(clickedTh);
+                    const oThs = originalTable.querySelectorAll('thead th');
+                    if (oThs[thIndex]) oThs[thIndex].click();
+                    return;
                 }
-                // If it matches a specific selected category (and that category is not 'Outros', or if 'Outros' is selected but this isn't an "other" item but matches a specific selected one)
-                if (selectedFilters.some(sf => sf !== 'outros' && operatorName.includes(sf))) {
-                    categoryConditionMet = true;
+
+                const cRow = e.target.closest('tr');
+                if (!cRow) return;
+                const idx = cRow.getAttribute('data-original-index');
+                if (idx === null) return;
+
+                const originalRows = originalTable.querySelectorAll('tbody tr');
+                const oRow = originalRows[idx];
+                if (!oRow) return;
+
+                if (e.target.closest('a')) {
+                    const cLinks = Array.from(cRow.querySelectorAll('a'));
+                    const clickedLink = e.target.closest('a');
+                    const linkIndex = cLinks.indexOf(clickedLink);
+                    const oLinks = oRow.querySelectorAll('a');
+                    if (oLinks[linkIndex]) oLinks[linkIndex].click();
+                } else if (e.target.closest('button') || e.target.closest('.dt-chart-table-icon')) {
+                    const cBtns = Array.from(cRow.querySelectorAll('button'));
+                    const clickedBtn = e.target.closest('button');
+                    const btnIndex = cBtns.indexOf(clickedBtn);
+                    const oBtns = oRow.querySelectorAll('button');
+                    if (oBtns[btnIndex]) oBtns[btnIndex].click();
                 }
-            }
-            row.style.display = (matchesSearch && categoryConditionMet) ? '' : 'none';
-        });
+            });
+        }
+
+        let isMultiMode = selectedFilters.length > 1;
+
+        if (isMultiMode) {
+            originalTable.style.display = 'none';
+            customContainer.style.display = 'block';
+
+            let groups = {};
+            selectedFilters.forEach(f => groups[f] = []);
+
+            tableRows.forEach((row, index) => {
+                let operatorNameCell = row.querySelector('td a');
+                if (!operatorNameCell) return;
+                let operatorName = operatorNameCell.textContent.toLowerCase();
+
+                let matchesSearch = searchValue === '' || operatorName.includes(searchValue);
+                if (!matchesSearch) return;
+
+                let isOtherSelected = selectedFilters.includes('Outros');
+                let matchedFilter = null;
+
+                for (let f of selectedFilters) {
+                    if (f !== 'Outros' && operatorName.includes(f.toLowerCase())) {
+                        matchedFilter = f;
+                        break;
+                    }
+                }
+
+                if (!matchedFilter && isOtherSelected) {
+                    let matchesAnyPredefined = predefinedFilters.slice(0, -1).some(def => operatorName.includes(def.value.toLowerCase()));
+                    if (!matchesAnyPredefined) {
+                        matchedFilter = 'Outros';
+                    }
+                }
+
+                if (matchedFilter) {
+                    groups[matchedFilter].push({ row, index });
+                }
+            });
+
+            selectedFilters.forEach(filterName => {
+                let groupId = 'group-' + filterName.replace(/\W/g, '');
+                let groupDiv = document.getElementById(groupId);
+
+                if (!groupDiv) {
+                    groupDiv = document.createElement('div');
+                    groupDiv.id = groupId;
+                    groupDiv.style.marginBottom = '30px';
+
+                    let header = document.createElement('h4');
+                    header.textContent = 'Departamento: ' + filterName;
+                    Object.assign(header.style, {
+                        backgroundColor: '#f8f9fa', padding: '12px 15px', borderLeft: '5px solid #007bff',
+                        marginTop: '20px', fontWeight: 'bold', borderRadius: '4px', color: '#333', fontSize: '16px'
+                    });
+
+                    let tableClone = originalTable.cloneNode(false);
+                    tableClone.removeAttribute('id');
+                    tableClone.classList.add('custom-cloned-table'); // AQUI ESTÁ A CORREÇÃO DE DUPLICAÇÃO
+                    tableClone.style.display = '';
+
+                    let theadOriginal = originalTable.querySelector('thead');
+                    if (theadOriginal) tableClone.appendChild(theadOriginal.cloneNode(true));
+
+                    let tbody = document.createElement('tbody');
+                    tableClone.appendChild(tbody);
+
+                    groupDiv.appendChild(header);
+                    groupDiv.appendChild(tableClone);
+                    customContainer.appendChild(groupDiv);
+                }
+
+                let tbody = groupDiv.querySelector('tbody');
+                let validIndices = new Set();
+
+                groups[filterName].forEach(item => {
+                    validIndices.add(item.index.toString());
+                    let existingRow = tbody.querySelector(`tr[data-original-index="${item.index}"]`);
+
+                    if (existingRow) {
+                        for (let i = 1; i < item.row.cells.length; i++) {
+                            if(existingRow.cells[i]) {
+                                existingRow.cells[i].innerHTML = item.row.cells[i].innerHTML;
+                                existingRow.cells[i].className = item.row.cells[i].className;
+                            }
+                        }
+                        tbody.appendChild(existingRow);
+                    } else {
+                        let newRow = item.row.cloneNode(true);
+                        newRow.setAttribute('data-original-index', item.index);
+                        newRow.style.display = '';
+                        tbody.appendChild(newRow);
+                    }
+                });
+
+                Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+                    if (!validIndices.has(tr.getAttribute('data-original-index'))) tr.remove();
+                });
+            });
+
+            Array.from(customContainer.children).forEach(child => {
+                let activeIds = selectedFilters.map(f => 'group-' + f.replace(/\W/g, ''));
+                if (!activeIds.includes(child.id)) child.remove();
+            });
+
+        } else {
+            originalTable.style.display = '';
+            customContainer.style.display = 'none';
+
+            let selectedFiltersLower = selectedFilters.map(f => f.toLowerCase());
+
+            tableRows.forEach(function(row) {
+                let operatorNameCell = row.querySelector('td a');
+                if (!operatorNameCell) return;
+                let operatorName = operatorNameCell.textContent.toLowerCase();
+
+                let matchesSearch = searchValue === '' || operatorName.includes(searchValue);
+                let matchesCategories = selectedFiltersLower.length === 0 || selectedFiltersLower.some(filter => operatorName.includes(filter));
+                let isOtherCategorySelected = selectedFiltersLower.includes('outros');
+                let matchesOutros = false;
+
+                if (isOtherCategorySelected) {
+                    matchesOutros = !predefinedFilters.slice(0, -1).some(filterDef => operatorName.includes(filterDef.value.toLowerCase()));
+                }
+
+                let categoryConditionMet = false;
+                if (selectedFiltersLower.length === 0) {
+                    categoryConditionMet = true;
+                } else {
+                    if (isOtherCategorySelected && matchesOutros) {
+                        categoryConditionMet = true;
+                    }
+                    if (selectedFiltersLower.some(sf => sf !== 'outros' && operatorName.includes(sf))) {
+                        categoryConditionMet = true;
+                    }
+                }
+                row.style.display = (matchesSearch && categoryConditionMet) ? '' : 'none';
+            });
+        }
+
         updateCheckboxCounts();
     }
 
     function updateCheckboxCounts() {
-        // console.log('[FilterScript] updateCheckboxCounts called.'); // DEBUG (can be noisy)
+        let originalTable = document.querySelector('table.dt-chart-table:not(.custom-cloned-table)');
+        if (!originalTable) return;
+
+        let tableRows = originalTable.querySelectorAll('tbody tr');
+
         predefinedFilters.forEach(filter => {
             let count = 0;
-            document.querySelectorAll('table.dt-chart-table tbody tr').forEach(row => {
+            tableRows.forEach(row => {
                 let operatorNameCell = row.querySelector('td a');
                 if (!operatorNameCell) return;
                 let operatorName = operatorNameCell.textContent.toLowerCase();
@@ -359,144 +489,107 @@ function createSearchAndToggleButton() {
     }
 
     const applyFilterInterval = setInterval(() => {
-        if (isCorrectPage() && externalSearchInput) { // Check if externalSearchInput is initialized
-            // console.log('[FilterScript] Interval: Applying filter.'); // DEBUG (very noisy)
-            applyFilter(externalSearchInput.value); // Re-applying filter periodically can be heavy. MutationObserver should handle most.
-            // Let's use this interval mainly for count updates if table content changes without DOM mutation (rare)
-            updateCheckboxCounts();
+        if (isCorrectPage() && externalSearchInput) {
+            applyFilter(externalSearchInput.value);
         }
-    }, 5000); // Increased interval
+    }, 5000);
 
     function isCorrectPage() {
-        const onCorrectPage = window.location.hash.includes('#!/sitatual');
-        // console.log('[FilterScript] isCorrectPage check. Hash:', window.location.hash, 'Result:', onCorrectPage); // DEBUG (very noisy, enable if needed)
-        return onCorrectPage;
+        return window.location.hash.includes('#!/sitatual');
     }
 
     let uiInitialized = false;
-    let observer; // Declare observer in a broader scope
+    let observer;
 
     function initializeUI() {
-        console.log(`[FilterScript] initializeUI called. Current hash: ${window.location.hash}, isCorrectPage: ${isCorrectPage()}, uiInitialized: ${uiInitialized}`); // DEBUG
-
         if (!isCorrectPage()) {
-            console.log('[FilterScript] Not on the correct page section. Aborting UI creation for now.');
             return;
         }
 
         if (uiInitialized) {
-            console.log('[FilterScript] UI already marked as initialized. Ensuring elements exist or recreating if necessary.');
-            // Check if elements are still there, sometimes SPAs can remove them
             const searchToggleWrapper = document.querySelector('div[data-userscript-filter="search-toggle-wrapper"]');
             const panel = document.getElementById('filterPanel');
             if (!searchToggleWrapper || !panel) {
-                console.log('[FilterScript] UI elements missing, forcing re-initialization.');
-                uiInitialized = false; // Force re-init
+                uiInitialized = false;
             } else {
-                console.log('[FilterScript] UI elements seem to exist. No re-init needed now.');
-                return; // Already initialized and elements are present
+                return;
             }
         }
 
-        let table = document.querySelector('table.dt-chart-table');
-        console.log('[FilterScript] Attempting to find table:', table); // DEBUG
+        // Garante que só selecionamos a tabela original para montar as UI e o MutationObserver
+        let table = document.querySelector('table.dt-chart-table:not(.custom-cloned-table)');
 
         if (table) {
-            console.log('[FilterScript] Table found. Creating UI elements.'); // DEBUG
-            createSearchAndToggleButton(); // Create the search box and load its value FIRST
-            createFilterPanel();           // Create the panel and apply the initial filter SECOND
+            createSearchAndToggleButton();
+            createFilterPanel();
             if (typeof observeTable === "function") observeTable();
             uiInitialized = true;
-            console.log('[FilterScript] UI Initialization complete. uiInitialized set to true.'); // DEBUG
         } else {
-            console.log('[FilterScript] Table not found. Retrying in 1000ms.'); // DEBUG
-            setTimeout(initializeUI, 1000); // Increased timeout slightly
+            setTimeout(initializeUI, 1000);
         }
     }
 
     function observeTable() {
-        console.log('[FilterScript] observeTable called.'); // DEBUG
-        let tableBody = document.querySelector('table.dt-chart-table tbody');
-        if (tableBody) {
-            if (observer) observer.disconnect(); // Disconnect previous if any
-            observer = new MutationObserver(function(mutations) {
-                console.log('[FilterScript] MutationObserver detected changes.'); // DEBUG
-                if (externalSearchInput) {
-                    applyFilter(externalSearchInput.value);
-                } else {
-                    applyFilter('');
-                }
-                updateCheckboxCounts();
-            });
-            observer.observe(tableBody, { childList: true, subtree: true });
-            console.log('[FilterScript] MutationObserver started on table tbody.'); // DEBUG
+        let originalTable = document.querySelector('table.dt-chart-table:not(.custom-cloned-table)');
+        if (originalTable) {
+            let tableBody = originalTable.querySelector('tbody');
+            if (tableBody) {
+                if (observer) observer.disconnect();
+                observer = new MutationObserver(function(mutations) {
+                    if (externalSearchInput) {
+                        applyFilter(externalSearchInput.value);
+                    } else {
+                        applyFilter('');
+                    }
+                });
+                observer.observe(tableBody, { childList: true, subtree: true });
+            }
         } else {
-            console.warn('[FilterScript] Table tbody not found for MutationObserver. Retrying observation setup.'); // DEBUG
-            setTimeout(observeTable, 1000); // Retry if tbody not found yet
+            setTimeout(observeTable, 1000);
         }
     }
 
     window.addEventListener('hashchange', function() {
-        console.log(`[FilterScript] hashchange detected. New hash: ${window.location.hash}. uiInitialized: ${uiInitialized}`); // DEBUG
-
         const panel = document.getElementById('filterPanel');
         const searchToggleWrapper = document.querySelector('div[data-userscript-filter="search-toggle-wrapper"]');
 
         if (!isCorrectPage()) {
-            console.log('[FilterScript] Navigated away from target page section.'); // DEBUG
             document.body.classList.remove('filter-open');
             if (searchToggleWrapper) {
-                console.log('[FilterScript] Hiding search/toggle wrapper.');
-                searchToggleWrapper.style.display = 'none'; // Hide instead of remove
+                searchToggleWrapper.style.display = 'none';
             }
             if (panel) {
-                console.log('[FilterScript] Hiding filter panel.');
-                panel.style.display = 'none'; // Hide instead of remove
+                panel.style.display = 'none';
             }
             if (observer && typeof observer.disconnect === 'function') {
-                console.log('[FilterScript] Disconnecting MutationObserver due to navigation.');
                 observer.disconnect();
             }
-            // uiInitialized remains true, but elements are hidden.
-            // initializeUI will handle re-showing or re-creating if needed on navigating back.
         } else {
-            console.log('[FilterScript] Navigated to target page section.'); // DEBUG
             if (!searchToggleWrapper || searchToggleWrapper.style.display === 'none' || !panel) {
-                 console.log('[FilterScript] UI elements not visible or panel missing, attempting to re-initialize/show.');
-                 uiInitialized = false; // Force re-check in initializeUI
+                 uiInitialized = false;
                  initializeUI();
             } else if (searchToggleWrapper && searchToggleWrapper.style.display === 'none') {
-                console.log('[FilterScript] Search/toggle wrapper was hidden, making it visible.');
                 searchToggleWrapper.style.display = 'inline-flex';
-            } else {
-                console.log('[FilterScript] UI seems to be present and visible.');
             }
-            // Ensure observer is running if it was disconnected
-            if (observer && !observer.takeRecords().length) { // A bit of a hack to check if observing
+            if (observer && !observer.takeRecords().length) {
                  observeTable();
             }
         }
     });
 
-    // Initial call
-    // Wait for the DOM to be a bit more settled, especially for SPAs
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initializeUI);
     } else {
-        // DOMContentLoaded has already fired or not applicable (e.g. script injected later)
-        // Give a small delay for SPAs to potentially render initial content
         setTimeout(initializeUI, 200);
     }
-
 
     const style = document.createElement('style');
     style.textContent = `
         body.filter-open {  margin-left: 150px;  }
         #filterPanel input[type="checkbox"] { cursor: pointer; transform: scale(1.2); transition: all 0.2s ease; margin-right: 5px; }
         #filterPanel label { cursor: pointer; }
-        div[data-userscript-filter="search-toggle-wrapper"] { vertical-align: middle; } /* Helps with alignment if header content is weird */
+        div[data-userscript-filter="search-toggle-wrapper"] { vertical-align: middle; }
     `;
     document.head.appendChild(style);
-    console.log('[FilterScript] Styles appended.'); // DEBUG
 
 })();
