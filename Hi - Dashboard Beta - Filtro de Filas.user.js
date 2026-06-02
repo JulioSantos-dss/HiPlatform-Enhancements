@@ -9,6 +9,8 @@
 // @allFrames    true
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=directtalk.com.br
 // @grant        none
+// @downloadURL  https://raw.githubusercontent.com/JulioSantos-dss/HiPlatform-Enhancements/main/Hi%20-%20Dashboard%20Beta%20-%20Filtro%20de%20Filas.user.js
+// @updateURL    https://raw.githubusercontent.com/JulioSantos-dss/HiPlatform-Enhancements/main/Hi%20-%20Dashboard%20Beta%20-%20Filtro%20de%20Filas.user.js
 // ==/UserScript==
 
 (function() {
