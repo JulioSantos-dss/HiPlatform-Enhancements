@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hi - Dashboard Beta - Filtro de Filas
 // @namespace    http://tampermonkey.net/
-// @version      1.6
+// @version      1.7
 // @description  Adds multiple custom macro buttons to auto-select DirectTalk departments.
 // @author       You
 // @match        *://*.directtalk.com.br/*
@@ -25,7 +25,8 @@
     // 'label' is what the button says. 'terms' are the words it looks for (without accents).
     const buttonsConfig = [
         { label: '⚡ Selecionar Help', terms: ['HELP'] },
-        { label: '⚡ Selecionar SAC / Help', terms: ['SAC', 'HELP'] },
+        { label: '⚡ Selecionar SAC', terms: ['SAC', 'API'] },
+        { label: '⚡ Selecionar SAC / Help', terms: ['SAC', 'HELP', 'API'] },
         { label: '⚡ Selecionar Refidelização', terms: ['REFIDELIZACAO'] },
         { label: '⚡ Selecionar Cobrança', terms: ['COBRANCA'] },
         { label: '⚡ Selecionar Casos Críticos', terms: ['CASOS CRITICOS'] },
